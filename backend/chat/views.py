@@ -2,8 +2,9 @@ import json
 
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import ChatSession, ChatMessage
@@ -97,6 +98,10 @@ def chat_messages(request):
         content=user_text,
     )
 
+    if not session.title:
+        session.title = user_text[:60]
+        session.save(update_fields=["title", "updated_at"])
+
     assistant_reply = build_hakim_reply(user_text)
 
     assistant_message = ChatMessage.objects.create(
@@ -115,4 +120,62 @@ def chat_messages(request):
             "assistant_message_id": assistant_message.id,
         },
         status=201,
+    )
+
+
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def chat_sessions(request):
+    sessions = ChatSession.objects.filter(user=request.user).order_by("-updated_at")
+
+    data = []
+    for session in sessions:
+        last_message = session.messages.order_by("-created_at").first()
+
+        data.append(
+            {
+                "id": str(session.id),
+                "title": session.title or "محادثة بدون عنوان",
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "last_message": last_message.content if last_message else "",
+                "messages_count": session.messages.count(),
+            }
+        )
+
+    return JsonResponse({"sessions": data}, status=200)
+
+
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def chat_session_detail(request, session_id):
+    session = get_object_or_404(
+        ChatSession,
+        id=session_id,
+        user=request.user,
+    )
+
+    messages = [
+        {
+            "id": message.id,
+            "sender": message.sender,
+            "content": message.content,
+            "created_at": message.created_at.isoformat(),
+        }
+        for message in session.messages.all()
+    ]
+
+    return JsonResponse(
+        {
+            "session": {
+                "id": str(session.id),
+                "title": session.title or "محادثة بدون عنوان",
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+            },
+            "messages": messages,
+        },
+        status=200,
     )
