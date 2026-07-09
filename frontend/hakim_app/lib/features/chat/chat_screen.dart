@@ -65,22 +65,38 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
     _scrollToBottom();
 
-    final hakimReply = await _chatReplyService.getReply(
-      message: text,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _messages.add(
-        _ChatMessage(
-          text: hakimReply,
-          isUser: false,
-          createdAt: DateTime.now(),
-        ),
+    try {
+      final hakimReply = await _chatReplyService.getReply(
+        message: text,
       );
-      _isHakimTyping = false;
-    });
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          _ChatMessage(
+            text: hakimReply,
+            isUser: false,
+            createdAt: DateTime.now(),
+          ),
+        );
+        _isHakimTyping = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          _ChatMessage(
+            text:
+            'تعذر الاتصال بالخادم حالياً. تأكد من تشغيل السيرفر واتصال الجوال واللابتوب على نفس الشبكة.',
+            isUser: false,
+            createdAt: DateTime.now(),
+          ),
+        );
+        _isHakimTyping = false;
+      });
+    }
 
     _scrollToBottom();
   }
