@@ -1,4 +1,5 @@
 import 'chat_api.dart';
+import 'chat_reply_result.dart';
 
 class ChatReplyService {
   final ChatApi? chatApi;
@@ -12,7 +13,7 @@ class ChatReplyService {
     defaultValue: false,
   );
 
-  Future<String> getReply({
+  Future<ChatReplyResult> getReply({
     required String message,
     String? sessionId,
     String? token,
@@ -27,7 +28,10 @@ class ChatReplyService {
 
     await Future.delayed(const Duration(milliseconds: 700));
 
-    return _buildMockHakimReply(message);
+    return ChatReplyResult(
+      reply: _buildMockHakimReply(message),
+      sessionId: sessionId,
+    );
   }
 
   String _buildMockHakimReply(String userText) {

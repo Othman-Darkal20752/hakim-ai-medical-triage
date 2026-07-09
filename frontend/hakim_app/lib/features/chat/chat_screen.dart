@@ -16,12 +16,14 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
   final ChatReplyService _chatReplyService = ChatReplyService(
-  chatApi: ChatApi(ApiClient()),
-);
+    chatApi: ChatApi(ApiClient()),
+  );
 
   final List<_ChatMessage> _messages = [];
 
+  String? _sessionId;
   bool _isHakimTyping = false;
 
   @override
@@ -66,16 +68,19 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final hakimReply = await _chatReplyService.getReply(
+      final result = await _chatReplyService.getReply(
         message: text,
+        sessionId: _sessionId,
       );
 
       if (!mounted) return;
 
+      _sessionId = result.sessionId;
+
       setState(() {
         _messages.add(
           _ChatMessage(
-            text: hakimReply,
+            text: result.reply,
             isUser: false,
             createdAt: DateTime.now(),
           ),

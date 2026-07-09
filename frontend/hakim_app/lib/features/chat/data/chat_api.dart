@@ -1,11 +1,12 @@
 import '../../../core/network/api_client.dart';
+import 'chat_reply_result.dart';
 
 class ChatApi {
   final ApiClient _apiClient;
 
   ChatApi(this._apiClient);
 
-  Future<String> sendMessage({
+  Future<ChatReplyResult> sendMessage({
     required String message,
     String? sessionId,
     String? token,
@@ -15,10 +16,13 @@ class ChatApi {
       token: token,
       body: {
         'message': message,
-        'session_id': ?sessionId,
+        if (sessionId != null) 'session_id': sessionId,
       },
     );
 
-    return data['reply']?.toString() ?? 'لم يصل رد من الخادم.';
+    return ChatReplyResult(
+      reply: data['reply']?.toString() ?? 'لم يصل رد من الخادم.',
+      sessionId: data['session_id']?.toString() ?? sessionId,
+    );
   }
 }

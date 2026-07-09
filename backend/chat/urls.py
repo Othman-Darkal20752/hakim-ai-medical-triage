@@ -1,7 +1,6 @@
 from django.urls import path
-
-from .views import send_chat_message
+from .views import chat_messages
 
 urlpatterns = [
-    path("messages/", send_chat_message, name="send_chat_message"),
+    path("messages/", chat_messages, name="chat-messages"),
 ]

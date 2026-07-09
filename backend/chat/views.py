@@ -1,73 +1,78 @@
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
+import json
+
+from django.core.exceptions import ValidationError
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from .models import ChatSession, ChatMessage
 
 
-@api_view(["POST"])
-def send_chat_message(request):
-    message = request.data.get("message", "").strip()
-    session_id = request.data.get("session_id")
+def build_hakim_reply(user_message: str) -> str:
+    """
+    Temporary reply logic.
+    Later we will replace this with:
+    - safety triage checks
+    - emergency red flags
+    - AI model/API call
+    - specialty recommendation
+    """
+    return "رد تجريبي من Django"
 
-    if not message:
-        return Response(
-            {"detail": "message is required"},
-            status=status.HTTP_400_BAD_REQUEST,
+
+@csrf_exempt
+@require_POST
+def chat_messages(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON body"},
+            status=400,
         )
 
-    normalized_message = normalize_arabic(message)
+    user_text = str(payload.get("message", "")).strip()
+    session_id = payload.get("session_id")
 
-    emergency_keywords = [
-        "الم صدر",
-        "ضغط بالصدر",
-        "ضيق نفس",
-        "صعوبه تنفس",
-        "اغماء",
-        "فقدان الوعي",
-        "نزيف شديد",
-        "تشنج",
-        "شلل",
-        "ضعف مفاجئ",
-        "صعوبه بالكلام",
-        "اضطراب بالكلام",
-        "الم شديد جدا",
-    ]
-
-    has_emergency_flag = any(
-        keyword in normalized_message for keyword in emergency_keywords
-    )
-
-    if has_emergency_flag:
-        reply = (
-            "تنبيه مهم: بعض الأعراض التي ذكرتها قد تحتاج إلى رعاية عاجلة، "
-            "خاصة إذا كانت شديدة أو ظهرت بشكل مفاجئ. يرجى مراجعة الطوارئ "
-            "أو الاتصال بالإسعاف فوراً. حكيم يساعد في التوجيه الأولي فقط "
-            "ولا يقدم تشخيصاً نهائياً."
+    if not user_text:
+        return JsonResponse(
+            {"error": "Message is required"},
+            status=400,
         )
+
+    if session_id:
+        try:
+            session = ChatSession.objects.get(id=session_id)
+        except (ChatSession.DoesNotExist, ValidationError, ValueError):
+            return JsonResponse(
+                {"error": "Invalid or unknown session_id"},
+                status=400,
+            )
     else:
-        reply = (
-            "رد تجريبي من Django: فهمت عليك. حتى أقدر أوجهك بشكل أفضل، "
-            "أحتاج منك بعض التفاصيل:\n\n"
-            "1. منذ متى بدأت الأعراض؟\n"
-            "2. ما شدة الألم أو التعب من 1 إلى 10؟\n"
-            "3. هل يوجد حرارة، دوخة، ضيق تنفس، أو ألم صدر؟\n"
-            "4. هل لديك أمراض مزمنة، أدوية دائمة، أو حساسية؟"
-        )
+        session = ChatSession.objects.create()
 
-    return Response(
-        {
-            "reply": reply,
-            "session_id": session_id,
-            "source": "django_mock",
-        }
+    user_message = ChatMessage.objects.create(
+        session=session,
+        sender=ChatMessage.Sender.USER,
+        content=user_text,
     )
 
+    assistant_reply = build_hakim_reply(user_text)
 
-def normalize_arabic(value):
-    return (
-        value.lower()
-        .replace("أ", "ا")
-        .replace("إ", "ا")
-        .replace("آ", "ا")
-        .replace("ة", "ه")
-        .replace("ى", "ي")
+    assistant_message = ChatMessage.objects.create(
+        session=session,
+        sender=ChatMessage.Sender.ASSISTANT,
+        content=assistant_reply,
+    )
+
+    session.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "session_id": str(session.id),
+            "reply": assistant_reply,
+            "user_message_id": user_message.id,
+            "assistant_message_id": assistant_message.id,
+        },
+        status=201,
     )
