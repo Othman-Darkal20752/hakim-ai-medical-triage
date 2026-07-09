@@ -1,0 +1,19 @@
+{
+  "@@locale": "en",
+  "appName": "Hakim",
+  "appTagline": "Your guide to the right doctor",
+  "welcomeDisclaimer": "Hakim helps collect symptoms, detect emergency warning signs, and suggest the suitable medical specialty. It does not provide final diagnosis or prescribe treatment.",
+  "getStarted": "Get Started",
+  "chooseRole": "Choose Role",
+  "roleQuestion": "How do you want to use Hakim?",
+  "patient": "Patient",
+  "patientSubtitle": "Describe symptoms and get guided to the right specialty.",
+  "doctor": "Doctor",
+  "doctorSubtitle": "Manage profile and receive suitable patient requests later.",
+  "doctorFlowLater": "Doctor flow will be added later.",
+  "hakimChat": "Hakim Chat",
+  "chatWelcomeMessage": "Hello, I am Hakim. I can help guide you to the right medical specialty.",
+  "chatAskSymptoms": "Please describe your symptoms clearly.",
+  "symptomInputHint": "Describe your symptoms...",
+  "mockBotResponse": "Your message has been received. In the next step, Hakim will ask follow-up questions and check emergency warning signs before suggesting the suitable specialty."
+}

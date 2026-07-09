@@ -1,0 +1,345 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_theme.dart';
+import '../../l10n/generated/app_localizations.dart';
+import 'data/chat_reply_service.dart';
+import '../../core/network/api_client.dart';
+import 'data/chat_api.dart';
+
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final ChatReplyService _chatReplyService = ChatReplyService(
+  chatApi: ChatApi(ApiClient()),
+);
+
+  final List<_ChatMessage> _messages = [];
+
+  bool _isHakimTyping = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_messages.isEmpty) {
+      final l10n = AppLocalizations.of(context);
+
+      _messages.addAll([
+        _ChatMessage(
+          text: l10n.chatWelcomeMessage,
+          isUser: false,
+          createdAt: DateTime.now(),
+        ),
+        _ChatMessage(
+          text: l10n.chatAskSymptoms,
+          isUser: false,
+          createdAt: DateTime.now(),
+        ),
+      ]);
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+
+    if (text.isEmpty || _isHakimTyping) return;
+
+    setState(() {
+      _messages.add(
+        _ChatMessage(
+          text: text,
+          isUser: true,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _isHakimTyping = true;
+    });
+
+    _messageController.clear();
+    _scrollToBottom();
+
+    final hakimReply = await _chatReplyService.getReply(
+      message: text,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _messages.add(
+        _ChatMessage(
+          text: hakimReply,
+          isUser: false,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _isHakimTyping = false;
+    });
+
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text(l10n.hakimChat),
+      ),
+      body: Column(
+        children: [
+          _buildDisclaimerCard(),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              itemCount: _messages.length + (_isHakimTyping ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (_isHakimTyping && index == _messages.length) {
+                  return const _TypingBubble();
+                }
+
+                return _MessageBubble(message: _messages[index]);
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                top: BorderSide(color: AppTheme.border),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    textInputAction: TextInputAction.send,
+                    textAlign: TextAlign.start,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: l10n.symptomInputHint,
+                      filled: true,
+                      fillColor: AppTheme.inputBackground,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor:
+                  _isHakimTyping ? Colors.grey.shade400 : AppTheme.primary,
+                  child: IconButton(
+                    onPressed: _isHakimTyping ? null : _sendMessage,
+                    icon: const Icon(Icons.send_rounded),
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDisclaimerCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2F1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF99F6E4),
+        ),
+      ),
+      child: const Text(
+        'حكيم يساعدك في الفرز والتوجيه الأولي فقط، ولا يقدم تشخيصاً نهائياً أو وصف علاج.',
+        textAlign: TextAlign.start,
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.5,
+          color: Color(0xFF134E4A),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  final _ChatMessage message;
+
+  const _MessageBubble({
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.isUser;
+
+    return Align(
+      alignment: isUser
+          ? AlignmentDirectional.centerEnd
+          : AlignmentDirectional.centerStart,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.78,
+        ),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          decoration: BoxDecoration(
+            color: isUser ? AppTheme.primary : Colors.white,
+            borderRadius: BorderRadiusDirectional.only(
+              topStart: const Radius.circular(18),
+              topEnd: const Radius.circular(18),
+              bottomStart: Radius.circular(isUser ? 18 : 4),
+              bottomEnd: Radius.circular(isUser ? 4 : 18),
+            ),
+            border: Border.all(
+              color: isUser ? AppTheme.primary : AppTheme.border,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment:
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              Text(
+                isUser ? 'أنت' : 'حكيم',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isUser ? Colors.white70 : AppTheme.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                message.text,
+                textAlign: TextAlign.start,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.45,
+                  color: isUser ? Colors.white : const Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                TimeOfDay.fromDateTime(message.createdAt).format(context),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isUser ? Colors.white60 : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypingBubble extends StatelessWidget {
+  const _TypingBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppTheme.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text(
+              'حكيم يكتب...',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF475569),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatMessage {
+  final String text;
+  final bool isUser;
+  final DateTime createdAt;
+
+  const _ChatMessage({
+    required this.text,
+    required this.isUser,
+    required this.createdAt,
+  });
+}

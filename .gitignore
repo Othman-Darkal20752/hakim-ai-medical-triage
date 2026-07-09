@@ -1,0 +1,30 @@
+﻿# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flutter / Dart
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+
+# Android
+**/android/.gradle/
+**/android/local.properties
+
+# Python / Django
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/env/
+**/db.sqlite3
+**/.env
+**/media/
+**/staticfiles/
