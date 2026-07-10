@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import 'chat_history_snapshot.dart';
 import 'chat_session_detail.dart';
 import 'chat_session_summary.dart';
 
@@ -6,6 +7,12 @@ class ChatHistoryApi {
   final ApiClient _apiClient;
 
   ChatHistoryApi(this._apiClient);
+
+  Future<ChatHistorySnapshot> getHistory({required String token}) async {
+    final response = await _apiClient.get('/chat/history/', token: token);
+
+    return ChatHistorySnapshot.fromJson(response);
+  }
 
   Future<List<ChatSessionSummary>> getSessions({required String token}) async {
     final response = await _apiClient.get('/chat/sessions/', token: token);

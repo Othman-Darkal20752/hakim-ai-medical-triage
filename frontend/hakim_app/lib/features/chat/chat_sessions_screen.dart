@@ -4,6 +4,9 @@ import '../../core/network/api_client.dart';
 import '../auth/data/auth_service.dart';
 import 'chat_screen.dart';
 import 'data/chat_history_api.dart';
+import 'data/chat_history_repository.dart';
+import 'data/chat_history_snapshot.dart';
+import 'data/chat_session_detail.dart';
 import 'data/chat_session_summary.dart';
 
 enum _SessionAction { open, delete }
@@ -19,14 +22,22 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   final AuthService _authService = AuthService();
   final ChatHistoryApi _chatHistoryApi = ChatHistoryApi(ApiClient());
 
-  List<ChatSessionSummary> _sessions = [];
+  late final ChatHistoryRepository _chatHistoryRepository =
+      ChatHistoryRepository(_chatHistoryApi);
+
+  ChatHistorySnapshot _history = const ChatHistorySnapshot.empty();
 
   bool _isLoading = true;
+  bool _isOffline = false;
+  DateTime? _cachedAt;
+
   String? _errorMessage;
   String? _openingSessionId;
   String? _deletingSessionId;
 
   bool get _isBusy => _openingSessionId != null || _deletingSessionId != null;
+
+  List<ChatSessionSummary> get _sessions => _history.sessions;
 
   @override
   void initState() {
@@ -47,6 +58,19 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     return token;
   }
 
+  Future<int> _requireUserId() async {
+    final userId = await _authService.getUserId();
+
+    if (userId == null || userId <= 0) {
+      throw const ApiException(
+        'معرف المستخدم غير موجود. يرجى تسجيل الدخول مجددًا.',
+        statusCode: 401,
+      );
+    }
+
+    return userId;
+  }
+
   Future<void> _loadSessions() async {
     setState(() {
       _isLoading = true;
@@ -55,12 +79,19 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
 
     try {
       final token = await _requireAccessToken();
-      final sessions = await _chatHistoryApi.getSessions(token: token);
+      final userId = await _requireUserId();
+
+      final result = await _chatHistoryRepository.loadHistory(
+        token: token,
+        userId: userId,
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _sessions = sessions;
+        _history = result.history;
+        _isOffline = result.isOffline;
+        _cachedAt = result.cachedAt;
         _isLoading = false;
       });
     } catch (_) {
@@ -68,7 +99,9 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
 
       setState(() {
         _errorMessage =
-            'تعذر تحميل المحادثات السابقة. تأكد من تشغيل الخادم والاتصال بالشبكة.';
+            'تعذر تحميل المحادثات السابقة، ولا توجد نسخة محلية متاحة.';
+        _isOffline = false;
+        _cachedAt = null;
         _isLoading = false;
       });
     }
@@ -82,12 +115,13 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     });
 
     try {
-      final token = await _requireAccessToken();
+      final detail = _history.detailFor(session.id);
 
-      final detail = await _chatHistoryApi.getSessionDetail(
-        sessionId: session.id,
-        token: token,
-      );
+      if (detail == null) {
+        throw StateError(
+          'Session details are missing from the chat history snapshot.',
+        );
+      }
 
       if (!mounted) return;
 
@@ -100,11 +134,12 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
           builder: (_) => ChatScreen(
             initialSessionId: detail.id,
             initialMessages: detail.messages,
+            isReadOnly: _isOffline,
           ),
         ),
       );
 
-      if (mounted) {
+      if (mounted && !_isOffline) {
         await _loadSessions();
       }
     } catch (_) {
@@ -115,17 +150,22 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'تعذر فتح المحادثة. تأكد من تشغيل الخادم والاتصال بالشبكة.',
-          ),
-        ),
+        const SnackBar(content: Text('تعذر فتح المحادثة المحفوظة.')),
       );
     }
   }
 
   Future<void> _confirmDeleteSession(ChatSessionSummary session) async {
     if (_isBusy) return;
+
+    if (_isOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يمكن حذف المحادثات أثناء العمل دون اتصال.'),
+        ),
+      );
+      return;
+    }
 
     final title = session.title.isEmpty ? 'محادثة بدون عنوان' : session.title;
 
@@ -168,19 +208,38 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   }
 
   Future<void> _deleteSession(ChatSessionSummary session) async {
+    if (_isOffline) return;
+
     setState(() {
       _deletingSessionId = session.id;
     });
 
     try {
       final token = await _requireAccessToken();
+      final userId = await _requireUserId();
 
       await _chatHistoryApi.deleteSession(sessionId: session.id, token: token);
 
+      await _chatHistoryRepository.removeSessionFromCache(
+        userId: userId,
+        sessionId: session.id,
+      );
+
       if (!mounted) return;
 
+      final updatedSessions = _history.sessions
+          .where((item) => item.id != session.id)
+          .toList();
+
+      final updatedDetails = Map<String, ChatSessionDetail>.from(
+        _history.sessionDetails,
+      )..remove(session.id);
+
       setState(() {
-        _sessions.removeWhere((item) => item.id == session.id);
+        _history = ChatHistorySnapshot(
+          sessions: updatedSessions,
+          sessionDetails: updatedDetails,
+        );
         _deletingSessionId = null;
       });
 
@@ -227,7 +286,9 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     final localDateTime = dateTime.toLocal();
 
     final date =
-        '${localDateTime.year}/${localDateTime.month.toString().padLeft(2, '0')}/${localDateTime.day.toString().padLeft(2, '0')}';
+        '${localDateTime.year}/'
+        '${localDateTime.month.toString().padLeft(2, '0')}/'
+        '${localDateTime.day.toString().padLeft(2, '0')}';
 
     final time = TimeOfDay.fromDateTime(localDateTime).format(context);
 
@@ -238,7 +299,45 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('المحادثات السابقة')),
-      body: RefreshIndicator(onRefresh: _loadSessions, child: _buildBody()),
+      body: Column(
+        children: [
+          if (_isOffline) _buildOfflineBanner(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadSessions,
+              child: _buildBody(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOfflineBanner() {
+    final cachedAt = _cachedAt;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: Colors.amber.shade100,
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, color: Colors.amber.shade900),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              cachedAt == null
+                  ? 'أنت تعمل دون اتصال. يتم عرض النسخة المحفوظة.'
+                  : 'أنت تعمل دون اتصال. آخر تحديث: '
+                        '${_formatDate(context, cachedAt)}',
+              style: TextStyle(
+                color: Colors.amber.shade900,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -330,7 +429,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
                     ),
                   const SizedBox(height: 6),
                   Text(
-                    '${session.messagesCount} رسالة • ${_formatDate(context, session.updatedAt)}',
+                    '${session.messagesCount} رسالة • '
+                    '${_formatDate(context, session.updatedAt)}',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
@@ -348,8 +448,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
                     onSelected: (action) {
                       _handleSessionAction(action, session);
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
                         value: _SessionAction.open,
                         child: ListTile(
                           contentPadding: EdgeInsets.zero,
@@ -359,15 +459,21 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
                       ),
                       PopupMenuItem(
                         value: _SessionAction.delete,
+                        enabled: !_isOffline,
                         child: ListTile(
+                          enabled: !_isOffline,
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(
                             Icons.delete_outline_rounded,
-                            color: Colors.red,
+                            color: _isOffline ? Colors.grey : Colors.red,
                           ),
                           title: Text(
-                            'حذف المحادثة',
-                            style: TextStyle(color: Colors.red),
+                            _isOffline
+                                ? 'الحذف غير متاح دون اتصال'
+                                : 'حذف المحادثة',
+                            style: TextStyle(
+                              color: _isOffline ? Colors.grey : Colors.red,
+                            ),
                           ),
                         ),
                       ),

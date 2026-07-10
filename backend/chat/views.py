@@ -148,6 +148,66 @@ def chat_sessions(request):
 
     return JsonResponse({"sessions": data}, status=200)
 
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def chat_history(request):
+    sessions = (
+        ChatSession.objects
+        .filter(user=request.user)
+        .prefetch_related("messages")
+        .order_by("-updated_at")
+    )
+
+    session_summaries = []
+    session_details = {}
+
+    for session in sessions:
+        messages = list(session.messages.all())
+        last_message = messages[-1] if messages else None
+        session_id = str(session.id)
+        session_title = session.title or "محادثة بدون عنوان"
+
+        session_summaries.append(
+            {
+                "id": session_id,
+                "title": session_title,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "last_message": (
+                    last_message.content
+                    if last_message is not None
+                    else ""
+                ),
+                "messages_count": len(messages),
+            }
+        )
+
+        session_details[session_id] = {
+            "session": {
+                "id": session_id,
+                "title": session_title,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+            },
+            "messages": [
+                {
+                    "id": message.id,
+                    "sender": message.sender,
+                    "content": message.content,
+                    "created_at": message.created_at.isoformat(),
+                }
+                for message in messages
+            ],
+        }
+
+    return JsonResponse(
+        {
+            "sessions": session_summaries,
+            "session_details": session_details,
+        },
+        status=200,
+    )
 
 @api_view(["GET", "DELETE"])
 @authentication_classes([JWTAuthentication])

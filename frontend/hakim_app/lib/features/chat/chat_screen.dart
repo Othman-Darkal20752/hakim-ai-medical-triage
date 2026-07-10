@@ -12,11 +12,13 @@ import 'data/chat_reply_service.dart';
 class ChatScreen extends StatefulWidget {
   final String? initialSessionId;
   final List<ChatMessageDto> initialMessages;
+  final bool isReadOnly;
 
   const ChatScreen({
     super.key,
     this.initialSessionId,
     this.initialMessages = const [],
+    this.isReadOnly = false,
   });
 
   @override
@@ -59,7 +61,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    if (_messages.isEmpty) {
+    if (_messages.isEmpty && widget.initialSessionId == null) {
       final l10n = AppLocalizations.of(context);
 
       _messages.addAll([
@@ -78,6 +80,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    if (widget.isReadOnly) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'هذه المحادثة معروضة من النسخة المحلية. يلزم الاتصال بالخادم لإرسال رسالة.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final text = _messageController.text.trim();
 
     if (text.isEmpty || _isHakimTyping) return;
@@ -248,6 +261,27 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (widget.isReadOnly)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.amber.shade100,
+              child: Row(
+                children: [
+                  Icon(Icons.cloud_off_rounded, color: Colors.amber.shade900),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'أنت تعمل دون اتصال. هذه المحادثة متاحة للقراءة فقط.',
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -273,12 +307,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
+                    enabled: !widget.isReadOnly && !_isLoggingOut,
                     textInputAction: TextInputAction.send,
                     textAlign: TextAlign.start,
                     minLines: 1,
                     maxLines: 4,
                     decoration: InputDecoration(
-                      hintText: l10n.symptomInputHint,
+                      hintText: widget.isReadOnly
+                          ? 'الاتصال بالخادم مطلوب لمتابعة المحادثة'
+                          : l10n.symptomInputHint,
                       filled: true,
                       fillColor: AppTheme.inputBackground,
                       contentPadding: const EdgeInsets.symmetric(
@@ -290,17 +327,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    onSubmitted: widget.isReadOnly
+                        ? null
+                        : (_) => _sendMessage(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: _isHakimTyping
+                  backgroundColor: widget.isReadOnly || _isHakimTyping
                       ? Colors.grey.shade400
                       : AppTheme.primary,
                   child: IconButton(
-                    onPressed: _isHakimTyping ? null : _sendMessage,
+                    onPressed: widget.isReadOnly || _isHakimTyping
+                        ? null
+                        : _sendMessage,
                     icon: const Icon(Icons.send_rounded),
                     color: Colors.white,
                   ),

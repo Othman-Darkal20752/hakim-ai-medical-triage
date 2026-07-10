@@ -24,8 +24,17 @@ class ChatMessageDto {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'sender': sender,
+      'content': content,
+      'created_at': createdAt.toUtc().toIso8601String(),
+    };
+  }
+
   static DateTime _parseDateTime(Object? value) {
     return DateTime.tryParse(value?.toString() ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0);
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }

@@ -26,8 +26,19 @@ class ChatSessionSummary {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt.toUtc().toIso8601String(),
+      'last_message': lastMessage,
+      'messages_count': messagesCount,
+    };
+  }
+
   static DateTime _parseDateTime(Object? value) {
     return DateTime.tryParse(value?.toString() ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0);
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }
