@@ -148,11 +148,30 @@ class EncryptedChatCache {
   Future<void> deleteUserCache({required int userId}) async {
     _validateUserId(userId);
 
-    final box = await _getBox();
+    Object? firstError;
+    StackTrace? firstStackTrace;
 
-    await box.delete(_buildCacheEntryKey(userId));
+    // Delete the encryption key first. Even if deleting the Hive entry fails,
+    // the remaining encrypted data becomes unreadable.
+    try {
+      await _secureStorage.delete(key: _buildSecureKeyName(userId));
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
 
-    await _secureStorage.delete(key: _buildSecureKeyName(userId));
+    try {
+      final box = await _getBox();
+
+      await box.delete(_buildCacheEntryKey(userId));
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
+
+    if (firstError != null && firstStackTrace != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace);
+    }
   }
 
   Future<SecretKey> _getOrCreateSecretKey(int userId) async {

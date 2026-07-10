@@ -2,19 +2,23 @@ import '../../../core/network/api_client.dart';
 import 'auth_api.dart';
 import 'google_auth_service.dart';
 import 'token_storage.dart';
+import '../../chat/data/encrypted_chat_cache.dart';
 
 class AuthService {
   final AuthApi _authApi;
   final TokenStorage _tokenStorage;
   final GoogleAuthService _googleAuthService;
+  final EncryptedChatCache _encryptedChatCache;
 
   AuthService({
     AuthApi? authApi,
     TokenStorage? tokenStorage,
     GoogleAuthService? googleAuthService,
+    EncryptedChatCache? encryptedChatCache,
   }) : _authApi = authApi ?? AuthApi(ApiClient()),
        _tokenStorage = tokenStorage ?? TokenStorage(),
-       _googleAuthService = googleAuthService ?? GoogleAuthService();
+       _googleAuthService = googleAuthService ?? GoogleAuthService(),
+       _encryptedChatCache = encryptedChatCache ?? EncryptedChatCache();
 
   Future<void> login({
     required String username,
@@ -171,6 +175,12 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    final userId = await _tokenStorage.getUserId();
+
+    if (userId != null && userId > 0) {
+      await _encryptedChatCache.deleteUserCache(userId: userId);
+    }
+
     await _tokenStorage.clear();
 
     try {
