@@ -6,8 +6,17 @@ import 'data/chat_reply_service.dart';
 import '../../core/network/api_client.dart';
 import 'data/chat_api.dart';
 import '../auth/data/auth_service.dart';
+import 'data/chat_message_dto.dart';
+
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialSessionId;
+  final List<ChatMessageDto> initialMessages;
+
+  const ChatScreen({
+    super.key,
+    this.initialSessionId,
+    this.initialMessages = const [],
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -26,6 +35,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _sessionId;
   bool _isHakimTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _sessionId = widget.initialSessionId;
+
+    _messages.addAll(
+      widget.initialMessages.map(
+        (message) => _ChatMessage(
+          text: message.content,
+          isUser: message.isUser,
+          createdAt: message.createdAt.toLocal(),
+        ),
+      ),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -56,11 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _messages.add(
-        _ChatMessage(
-          text: text,
-          isUser: true,
-          createdAt: DateTime.now(),
-        ),
+        _ChatMessage(text: text, isUser: true, createdAt: DateTime.now()),
       );
       _isHakimTyping = true;
     });
@@ -98,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(
           _ChatMessage(
             text:
-            'تعذر الاتصال بالخادم حالياً. تأكد من تشغيل السيرفر واتصال الجوال واللابتوب على نفس الشبكة.',
+                'تعذر الاتصال بالخادم حالياً. تأكد من تشغيل السيرفر واتصال الجوال واللابتوب على نفس الشبكة.',
             isUser: false,
             createdAt: DateTime.now(),
           ),
@@ -137,6 +159,16 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(l10n.hakimChat),
+        actions: [
+          if (widget.initialSessionId == null)
+            IconButton(
+              tooltip: 'المحادثات السابقة',
+              onPressed: () {
+                Navigator.of(context).pushNamed('/chat-sessions');
+              },
+              icon: const Icon(Icons.history_rounded),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -159,9 +191,7 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: AppTheme.border),
-              ),
+              border: Border(top: BorderSide(color: AppTheme.border)),
             ),
             child: Row(
               children: [
@@ -191,8 +221,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor:
-                  _isHakimTyping ? Colors.grey.shade400 : AppTheme.primary,
+                  backgroundColor: _isHakimTyping
+                      ? Colors.grey.shade400
+                      : AppTheme.primary,
                   child: IconButton(
                     onPressed: _isHakimTyping ? null : _sendMessage,
                     icon: const Icon(Icons.send_rounded),
@@ -215,9 +246,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFE0F2F1),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFF99F6E4),
-        ),
+        border: Border.all(color: const Color(0xFF99F6E4)),
       ),
       child: const Text(
         'حكيم يساعدك في الفرز والتوجيه الأولي فقط، ولا يقدم تشخيصاً نهائياً أو وصف علاج.',
@@ -236,9 +265,7 @@ class _ChatScreenState extends State<ChatScreen> {
 class _MessageBubble extends StatelessWidget {
   final _ChatMessage message;
 
-  const _MessageBubble({
-    required this.message,
-  });
+  const _MessageBubble({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -275,8 +302,9 @@ class _MessageBubble extends StatelessWidget {
             ],
           ),
           child: Column(
-            crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
             children: [
               Text(
                 isUser ? 'أنت' : 'حكيم',
@@ -345,10 +373,7 @@ class _TypingBubble extends StatelessWidget {
             SizedBox(width: 8),
             Text(
               'حكيم يكتب...',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF475569),
-              ),
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
             ),
           ],
         ),
