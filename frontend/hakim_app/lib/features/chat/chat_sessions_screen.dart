@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
@@ -18,9 +21,11 @@ class ChatSessionsScreen extends StatefulWidget {
   State<ChatSessionsScreen> createState() => _ChatSessionsScreenState();
 }
 
-class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
+class _ChatSessionsScreenState extends State<ChatSessionsScreen>
+    with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final ChatHistoryApi _chatHistoryApi = ChatHistoryApi(ApiClient());
+  final Connectivity _connectivity = Connectivity();
 
   late final ChatHistoryRepository _chatHistoryRepository =
       ChatHistoryRepository(_chatHistoryApi);
@@ -35,14 +40,85 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   String? _openingSessionId;
   String? _deletingSessionId;
 
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _autoRetryTimer;
+  bool _isAutoRefreshing = false;
+
   bool get _isBusy => _openingSessionId != null || _deletingSessionId != null;
+
+  bool get _needsAutoRefresh => _isOffline || _errorMessage != null;
 
   List<ChatSessionSummary> get _sessions => _history.sessions;
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+      _handleConnectivityChanged,
+    );
+
     _loadSessions();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _retryWhenNetworkAvailable();
+    }
+  }
+
+  Future<void> _handleConnectivityChanged(
+    List<ConnectivityResult> connectivityResults,
+  ) async {
+    if (!mounted || !_needsAutoRefresh || _isLoading || _isAutoRefreshing) {
+      return;
+    }
+
+    final hasNetwork = connectivityResults.any(
+      (result) => result != ConnectivityResult.none,
+    );
+
+    if (!hasNetwork) {
+      return;
+    }
+
+    _isAutoRefreshing = true;
+
+    try {
+      await _loadSessions(showLoadingIndicator: false);
+    } finally {
+      _isAutoRefreshing = false;
+    }
+  }
+
+  Future<void> _retryWhenNetworkAvailable() async {
+    if (!mounted || !_needsAutoRefresh || _isLoading || _isAutoRefreshing) {
+      return;
+    }
+
+    try {
+      final connectivityResults = await _connectivity.checkConnectivity();
+
+      await _handleConnectivityChanged(connectivityResults);
+    } catch (_) {
+      // The existing encrypted cache remains available.
+    }
+  }
+
+  void _syncAutoRetryTimer() {
+    if (!_needsAutoRefresh) {
+      _autoRetryTimer?.cancel();
+      _autoRetryTimer = null;
+      return;
+    }
+
+    _autoRetryTimer ??= Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _retryWhenNetworkAvailable(),
+    );
   }
 
   Future<String> _requireAccessToken() async {
@@ -71,11 +147,17 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     return userId;
   }
 
-  Future<void> _loadSessions() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadSessions({bool showLoadingIndicator = true}) async {
+    if (showLoadingIndicator) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    } else {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
 
     try {
       final token = await _requireAccessToken();
@@ -94,6 +176,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
         _cachedAt = result.cachedAt;
         _isLoading = false;
       });
+
+      _syncAutoRetryTimer();
     } catch (_) {
       if (!mounted) return;
 
@@ -104,6 +188,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
         _cachedAt = null;
         _isLoading = false;
       });
+
+      _syncAutoRetryTimer();
     }
   }
 
@@ -293,6 +379,14 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     final time = TimeOfDay.fromDateTime(localDateTime).format(context);
 
     return '$date - $time';
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivitySubscription?.cancel();
+    _autoRetryTimer?.cancel();
+    super.dispose();
   }
 
   @override
