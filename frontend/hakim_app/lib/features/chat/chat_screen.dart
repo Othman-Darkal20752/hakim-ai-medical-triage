@@ -248,7 +248,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          _buildDisclaimerCard(),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -310,29 +309,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDisclaimerCard() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE0F2F1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF99F6E4)),
-      ),
-      child: const Text(
-        'حكيم يساعدك في الفرز والتوجيه الأولي فقط، ولا يقدم تشخيصاً نهائياً أو وصف علاج.',
-        textAlign: TextAlign.start,
-        style: TextStyle(
-          fontSize: 13,
-          height: 1.5,
-          color: Color(0xFF134E4A),
-          fontWeight: FontWeight.w600,
-        ),
       ),
     );
   }
