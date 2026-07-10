@@ -6,12 +6,14 @@ class TokenStorage {
   static const String _refreshTokenKey = 'hakim_refresh_token';
   static const String _usernameKey = 'hakim_username';
   static const String _roleKey = 'hakim_role';
+  static const String _userIdKey = 'hakim_user_id';
 
   static const List<String> _allKeys = [
     _accessTokenKey,
     _refreshTokenKey,
     _usernameKey,
     _roleKey,
+    _userIdKey,
   ];
 
   static final FlutterSecureStorage _secureStorage = FlutterSecureStorage(
@@ -35,10 +37,13 @@ class TokenStorage {
   }
 
   Future<void> saveUser({
+    required int userId,
     required String username,
     required String role,
   }) async {
     await _ensureLegacyDataMigrated();
+
+    await _secureStorage.write(key: _userIdKey, value: userId.toString());
 
     await _secureStorage.write(key: _usernameKey, value: username);
 
@@ -55,6 +60,14 @@ class TokenStorage {
     await _ensureLegacyDataMigrated();
 
     return _secureStorage.read(key: _refreshTokenKey);
+  }
+
+  Future<int?> getUserId() async {
+    await _ensureLegacyDataMigrated();
+
+    final value = await _secureStorage.read(key: _userIdKey);
+
+    return int.tryParse(value ?? '');
   }
 
   Future<String?> getUsername() async {
@@ -82,7 +95,7 @@ class TokenStorage {
       try {
         await runningMigration;
       } catch (_) {
-        // Continue clearing both secure and legacy storage.
+        // Continue clearing secure and legacy authentication data.
       }
     }
 

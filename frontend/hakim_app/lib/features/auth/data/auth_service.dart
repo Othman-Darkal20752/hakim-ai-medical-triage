@@ -56,14 +56,32 @@ class AuthService {
       throw const ApiException('لم يصل التوكن من الخادم.');
     }
 
+    final userData = await _authApi.me(token: accessToken);
+
+    await _saveUserData(userData: userData, fallbackUsername: fallbackUsername);
+
     await _tokenStorage.saveTokens(
       accessToken: accessToken,
       refreshToken: refreshToken,
     );
+  }
 
-    final userData = await _authApi.me(token: accessToken);
+  Future<void> _saveUserData({
+    required Map<String, dynamic> userData,
+    required String fallbackUsername,
+  }) async {
+    final rawUserId = userData['id'];
+
+    final userId = rawUserId is num
+        ? rawUserId.toInt()
+        : int.tryParse(rawUserId?.toString() ?? '');
+
+    if (userId == null || userId <= 0) {
+      throw const ApiException('لم يصل معرف المستخدم الصحيح من الخادم.');
+    }
 
     await _tokenStorage.saveUser(
+      userId: userId,
       username: userData['username']?.toString() ?? fallbackUsername,
       role: userData['role']?.toString() ?? 'patient',
     );
@@ -82,11 +100,18 @@ class AuthService {
     }
 
     try {
-      await _authApi.me(token: accessToken);
+      final userData = await _authApi.me(token: accessToken);
+
+      await _saveUserData(
+        userData: userData,
+        fallbackUsername:
+            await _tokenStorage.getUsername() ?? 'authenticated-user',
+      );
+
       return true;
-    } on ApiException catch (e) {
-      if (e.statusCode != 401) {
-        // يوجد توكن محفوظ، لكن الخادم أو الشبكة غير متاحين مؤقتًا.
+    } on ApiException catch (error) {
+      if (error.statusCode != 401) {
+        // Temporary server or network failure must not remove the local session.
         return true;
       }
     } catch (_) {
@@ -106,21 +131,27 @@ class AuthService {
       final newRefreshToken =
           refreshData['refresh']?.toString() ?? refreshToken;
 
+      final userData = await _authApi.me(token: newAccessToken);
+
+      await _saveUserData(
+        userData: userData,
+        fallbackUsername:
+            await _tokenStorage.getUsername() ?? 'authenticated-user',
+      );
+
       await _tokenStorage.saveTokens(
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       );
 
-      await _authApi.me(token: newAccessToken);
-
       return true;
-    } on ApiException catch (e) {
-      if (e.statusCode == 401) {
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
         await _tokenStorage.clear();
         return false;
       }
 
-      // لا نحذف تسجيل الدخول بسبب مشكلة شبكة مؤقتة.
+      // Temporary server or network failure must not remove the local session.
       return true;
     } catch (_) {
       return true;
@@ -129,6 +160,10 @@ class AuthService {
 
   Future<String?> getAccessToken() {
     return _tokenStorage.getAccessToken();
+  }
+
+  Future<int?> getUserId() {
+    return _tokenStorage.getUserId();
   }
 
   Future<bool> isLoggedIn() {
