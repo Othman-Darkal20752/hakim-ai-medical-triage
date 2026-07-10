@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../chat/chat_screen.dart';
@@ -14,31 +16,57 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   final AuthService _authService = AuthService();
 
-  late final Future<bool> _restoreSessionFuture;
+  bool? _hasLocalSession;
 
   @override
   void initState() {
     super.initState();
-    _restoreSessionFuture = _authService.restoreSession();
+    _initializeAuthentication();
+  }
+
+  Future<void> _initializeAuthentication() async {
+    final hasLocalSession = await _authService.isLoggedIn();
+
+    if (!mounted) return;
+
+    setState(() {
+      _hasLocalSession = hasLocalSession;
+    });
+
+    if (hasLocalSession) {
+      unawaited(_validateSessionInBackground());
+    }
+  }
+
+  Future<void> _validateSessionInBackground() async {
+    try {
+      final restored = await _authService.restoreSession().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => true,
+      );
+
+      if (!restored && mounted) {
+        setState(() {
+          _hasLocalSession = false;
+        });
+      }
+    } catch (_) {
+      // A temporary network or server failure must not block app startup.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _restoreSessionFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    final hasLocalSession = _hasLocalSession;
 
-        if (snapshot.data == true) {
-          return const ChatScreen();
-        }
+    if (hasLocalSession == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-        return const WelcomeScreen();
-      },
-    );
+    if (hasLocalSession) {
+      return const ChatScreen();
+    }
+
+    return const WelcomeScreen();
   }
 }
