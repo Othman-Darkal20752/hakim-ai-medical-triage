@@ -1,4 +1,4 @@
-package com.hakim.hakim_app
+package com.othman.hakim
 
 import io.flutter.embedding.android.FlutterActivity
 
