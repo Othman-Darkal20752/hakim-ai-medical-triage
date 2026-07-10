@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../chat/chat_screen.dart';
+import 'login_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -41,7 +41,7 @@ class RoleSelectionScreen extends StatelessWidget {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ChatScreen(),
+                    builder: (_) => const LoginScreen(),
                   ),
                 );
               },

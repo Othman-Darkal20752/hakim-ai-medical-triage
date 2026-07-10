@@ -11,13 +11,18 @@ class ChatApi {
     String? sessionId,
     String? token,
   }) async {
+    final body = <String, dynamic>{
+      'message': message,
+    };
+
+    if (sessionId != null) {
+      body['session_id'] = sessionId;
+    }
+
     final data = await _apiClient.post(
       '/chat/messages/',
       token: token,
-      body: {
-        'message': message,
-        if (sessionId != null) 'session_id': sessionId,
-      },
+      body: body,
     );
 
     return ChatReplyResult(

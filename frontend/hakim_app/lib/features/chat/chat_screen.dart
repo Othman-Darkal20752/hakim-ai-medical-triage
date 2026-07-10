@@ -5,7 +5,7 @@ import '../../l10n/generated/app_localizations.dart';
 import 'data/chat_reply_service.dart';
 import '../../core/network/api_client.dart';
 import 'data/chat_api.dart';
-
+import '../auth/data/auth_service.dart';
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -16,6 +16,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AuthService _authService = AuthService();
 
   final ChatReplyService _chatReplyService = ChatReplyService(
     chatApi: ChatApi(ApiClient()),
@@ -68,9 +69,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
+      final token = await _authService.getAccessToken();
+
       final result = await _chatReplyService.getReply(
         message: text,
         sessionId: _sessionId,
+        token: token,
       );
 
       if (!mounted) return;
