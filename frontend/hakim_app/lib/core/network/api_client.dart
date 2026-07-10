@@ -8,10 +8,7 @@ class ApiException implements Exception {
   final String message;
   final int? statusCode;
 
-  const ApiException(
-      this.message, {
-        this.statusCode,
-      });
+  const ApiException(this.message, {this.statusCode});
 
   @override
   String toString() {
@@ -22,40 +19,40 @@ class ApiException implements Exception {
 class ApiClient {
   final http.Client _client;
 
-  ApiClient({
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+  ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   Uri _buildUri(String path) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     return Uri.parse('${ApiConstants.baseUrl}$normalizedPath');
   }
 
-  Future<Map<String, dynamic>> get(
-      String path, {
-        String? token,
-      }) async {
+  Future<Map<String, dynamic>> get(String path, {String? token}) async {
     final response = await _client
-        .get(
-      _buildUri(path),
-      headers: _buildHeaders(token),
-    )
+        .get(_buildUri(path), headers: _buildHeaders(token))
         .timeout(ApiConstants.timeout);
 
     return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> post(
-      String path, {
-        required Map<String, dynamic> body,
-        String? token,
-      }) async {
+    String path, {
+    required Map<String, dynamic> body,
+    String? token,
+  }) async {
     final response = await _client
         .post(
-      _buildUri(path),
-      headers: _buildHeaders(token),
-      body: jsonEncode(body),
-    )
+          _buildUri(path),
+          headers: _buildHeaders(token),
+          body: jsonEncode(body),
+        )
+        .timeout(ApiConstants.timeout);
+
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> delete(String path, {String? token}) async {
+    final response = await _client
+        .delete(_buildUri(path), headers: _buildHeaders(token))
         .timeout(ApiConstants.timeout);
 
     return _handleResponse(response);
@@ -76,7 +73,9 @@ class ApiClient {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
-        body['detail']?.toString() ?? 'حدث خطأ أثناء الاتصال بالخادم',
+        body['detail']?.toString() ??
+            body['error']?.toString() ??
+            'حدث خطأ أثناء الاتصال بالخادم',
         statusCode: response.statusCode,
       );
     }

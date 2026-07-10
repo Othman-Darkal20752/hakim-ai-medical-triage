@@ -3,11 +3,13 @@ import json
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import ChatSession, ChatMessage
+from .models import ChatMessage, ChatSession
 
 
 def build_hakim_reply(user_message: str) -> str:
@@ -32,7 +34,7 @@ def get_or_create_chat_session(session_id, user):
 
     if not session_id:
         return ChatSession.objects.create(
-            user=user if user.is_authenticated else None
+            user=user if user.is_authenticated else None,
         ), None
 
     try:
@@ -147,7 +149,7 @@ def chat_sessions(request):
     return JsonResponse({"sessions": data}, status=200)
 
 
-@api_view(["GET"])
+@api_view(["GET", "DELETE"])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def chat_session_detail(request, session_id):
@@ -156,6 +158,10 @@ def chat_session_detail(request, session_id):
         id=session_id,
         user=request.user,
     )
+
+    if request.method == "DELETE":
+        session.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     messages = [
         {

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../auth/data/auth_service.dart';
+import 'chat_screen.dart';
 import 'data/chat_history_api.dart';
 import 'data/chat_session_summary.dart';
-import 'chat_screen.dart';
+
+enum _SessionAction { open, delete }
 
 class ChatSessionsScreen extends StatefulWidget {
   const ChatSessionsScreen({super.key});
@@ -15,7 +17,6 @@ class ChatSessionsScreen extends StatefulWidget {
 
 class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   final AuthService _authService = AuthService();
-
   final ChatHistoryApi _chatHistoryApi = ChatHistoryApi(ApiClient());
 
   List<ChatSessionSummary> _sessions = [];
@@ -23,11 +24,27 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String? _openingSessionId;
+  String? _deletingSessionId;
+
+  bool get _isBusy => _openingSessionId != null || _deletingSessionId != null;
 
   @override
   void initState() {
     super.initState();
     _loadSessions();
+  }
+
+  Future<String> _requireAccessToken() async {
+    final token = await _authService.getAccessToken();
+
+    if (token == null || token.isEmpty) {
+      throw const ApiException(
+        'جلسة تسجيل الدخول غير موجودة.',
+        statusCode: 401,
+      );
+    }
+
+    return token;
   }
 
   Future<void> _loadSessions() async {
@@ -37,15 +54,7 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
     });
 
     try {
-      final token = await _authService.getAccessToken();
-
-      if (token == null || token.isEmpty) {
-        throw const ApiException(
-          'جلسة تسجيل الدخول غير موجودة.',
-          statusCode: 401,
-        );
-      }
-
+      final token = await _requireAccessToken();
       final sessions = await _chatHistoryApi.getSessions(token: token);
 
       if (!mounted) return;
@@ -66,21 +75,14 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
   }
 
   Future<void> _openSession(ChatSessionSummary session) async {
-    if (_openingSessionId != null) return;
+    if (_isBusy) return;
 
     setState(() {
       _openingSessionId = session.id;
     });
 
     try {
-      final token = await _authService.getAccessToken();
-
-      if (token == null || token.isEmpty) {
-        throw const ApiException(
-          'جلسة تسجيل الدخول غير موجودة.',
-          statusCode: 401,
-        );
-      }
+      final token = await _requireAccessToken();
 
       final detail = await _chatHistoryApi.getSessionDetail(
         sessionId: session.id,
@@ -119,6 +121,105 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _confirmDeleteSession(ChatSessionSummary session) async {
+    if (_isBusy) return;
+
+    final title = session.title.isEmpty ? 'محادثة بدون عنوان' : session.title;
+
+    final shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('حذف المحادثة'),
+              content: Text(
+                'هل أنت متأكد من حذف "$title"؟\n\n'
+                'لا يمكن التراجع عن هذا الإجراء.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(false);
+                  },
+                  child: const Text('إلغاء'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('حذف'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldDelete || !mounted) return;
+
+    await _deleteSession(session);
+  }
+
+  Future<void> _deleteSession(ChatSessionSummary session) async {
+    setState(() {
+      _deletingSessionId = session.id;
+    });
+
+    try {
+      final token = await _requireAccessToken();
+
+      await _chatHistoryApi.deleteSession(sessionId: session.id, token: token);
+
+      if (!mounted) return;
+
+      setState(() {
+        _sessions.removeWhere((item) => item.id == session.id);
+        _deletingSessionId = null;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حذف المحادثة بنجاح.')));
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _deletingSessionId = null;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _deletingSessionId = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذر حذف المحادثة. يلزم الاتصال بالخادم للمحاولة من جديد.',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _handleSessionAction(_SessionAction action, ChatSessionSummary session) {
+    switch (action) {
+      case _SessionAction.open:
+        _openSession(session);
+      case _SessionAction.delete:
+        _confirmDeleteSession(session);
     }
   }
 
@@ -199,12 +300,12 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final session = _sessions[index];
+        final isOpening = _openingSessionId == session.id;
+        final isDeleting = _deletingSessionId == session.id;
 
         return Card(
           child: ListTile(
-            onTap: _openingSessionId == null
-                ? () => _openSession(session)
-                : null,
+            onTap: _isBusy ? null : () => _openSession(session),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 10,
@@ -235,13 +336,43 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen> {
                 ],
               ),
             ),
-            trailing: _openingSessionId == session.id
+            trailing: isOpening || isDeleting
                 ? const SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.chevron_right_rounded),
+                : PopupMenuButton<_SessionAction>(
+                    enabled: !_isBusy,
+                    tooltip: 'خيارات المحادثة',
+                    onSelected: (action) {
+                      _handleSessionAction(action, session);
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _SessionAction.open,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.open_in_new_rounded),
+                          title: Text('فتح المحادثة'),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: _SessionAction.delete,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.red,
+                          ),
+                          title: Text(
+                            'حذف المحادثة',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         );
       },

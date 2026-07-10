@@ -32,4 +32,11 @@ class ChatHistoryApi {
 
     return ChatSessionDetail.fromJson(response);
   }
+
+  Future<void> deleteSession({
+    required String sessionId,
+    required String token,
+  }) async {
+    await _apiClient.delete('/chat/sessions/$sessionId/', token: token);
+  }
 }
