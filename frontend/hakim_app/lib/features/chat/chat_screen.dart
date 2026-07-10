@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
-import 'data/chat_reply_service.dart';
-import '../../core/network/api_client.dart';
-import 'data/chat_api.dart';
 import '../auth/data/auth_service.dart';
+import '../onboarding/welcome_screen.dart';
+import 'data/chat_api.dart';
 import 'data/chat_message_dto.dart';
+import 'data/chat_reply_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String? initialSessionId;
@@ -35,6 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _sessionId;
   bool _isHakimTyping = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -144,6 +146,67 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _confirmLogout() async {
+    final shouldLogout =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('تسجيل الخروج'),
+              content: const Text(
+                'هل أنت متأكد أنك تريد تسجيل الخروج من حسابك؟',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(false);
+                  },
+                  child: const Text('إلغاء'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(true);
+                  },
+                  child: const Text('تسجيل الخروج'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldLogout || !mounted) return;
+
+    await _logout();
+  }
+
+  Future<void> _logout() async {
+    setState(() {
+      _isLoggingOut = true;
+    });
+
+    try {
+      await _authService.logout();
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        (route) => false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoggingOut = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تسجيل الخروج. حاول مرة أخرى.')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
@@ -163,11 +226,24 @@ class _ChatScreenState extends State<ChatScreen> {
           if (widget.initialSessionId == null)
             IconButton(
               tooltip: 'المحادثات السابقة',
-              onPressed: () {
-                Navigator.of(context).pushNamed('/chat-sessions');
-              },
+              onPressed: _isLoggingOut
+                  ? null
+                  : () {
+                      Navigator.of(context).pushNamed('/chat-sessions');
+                    },
               icon: const Icon(Icons.history_rounded),
             ),
+          IconButton(
+            tooltip: 'تسجيل الخروج',
+            onPressed: _isLoggingOut ? null : _confirmLogout,
+            icon: _isLoggingOut
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout_rounded),
+          ),
         ],
       ),
       body: Column(

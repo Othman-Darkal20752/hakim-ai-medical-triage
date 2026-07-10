@@ -23,7 +23,7 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({
-                'password_confirm': 'Passwords do not match.'
+                'password_confirm': 'Passwords do not match.',
             })
         return attrs
 
@@ -43,6 +43,13 @@ class RegisterSerializer(serializers.Serializer):
         )
 
         return user
+
+
+class GoogleLoginSerializer(serializers.Serializer):
+    id_token = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
 
 
 class MeSerializer(serializers.ModelSerializer):

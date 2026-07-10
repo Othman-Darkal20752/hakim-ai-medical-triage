@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../chat/chat_screen.dart';
 import 'data/auth_service.dart';
+import 'data/google_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,8 +24,11 @@ class _LoginScreenState extends State<LoginScreen> {
     text: 'Test12345!',
   );
 
-  bool _isLoading = false;
+  bool _isPasswordLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
+
+  bool get _isBusy => _isPasswordLoading || _isGoogleLoading;
 
   Future<void> _login() async {
     final username = _usernameController.text.trim();
@@ -37,38 +42,84 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() {
-      _isLoading = true;
+      _isPasswordLoading = true;
       _errorMessage = null;
     });
 
     try {
-      await _authService.login(
-        username: username,
-        password: password,
-      );
+      await _authService.login(username: username, password: password);
 
-      if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const ChatScreen(),
-        ),
-      );
+      _openChat();
     } on ApiException catch (e) {
-      setState(() {
-        _errorMessage = e.message;
-      });
+      _setError(e.message);
     } catch (_) {
-      setState(() {
-        _errorMessage = 'تعذر تسجيل الدخول. تأكد من تشغيل الخادم.';
-      });
+      _setError('تعذر تسجيل الدخول. تأكد من تشغيل الخادم.');
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isPasswordLoading = false;
         });
       }
     }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _authService.loginWithGoogle();
+
+      _openChat();
+    } on GoogleAuthConfigurationException catch (e) {
+      _setError(e.message);
+    } on GoogleSignInException catch (e) {
+      _setError(_googleErrorMessage(e));
+    } on ApiException catch (e) {
+      _setError(e.message);
+    } catch (_) {
+      _setError(
+        'تعذر تسجيل الدخول باستخدام Google. تحقق من الاتصال وإعدادات الخادم.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+      }
+    }
+  }
+
+  String _googleErrorMessage(GoogleSignInException exception) {
+    return switch (exception.code) {
+      GoogleSignInExceptionCode.canceled =>
+        'تم إلغاء تسجيل الدخول باستخدام Google.',
+      GoogleSignInExceptionCode.clientConfigurationError =>
+        'إعداد Google غير صحيح. تحقق من package name وSHA-1 وWeb Client ID.',
+      GoogleSignInExceptionCode.providerConfigurationError =>
+        'خدمة Google Sign-In غير متاحة أو غير مضبوطة على الجهاز.',
+      GoogleSignInExceptionCode.uiUnavailable =>
+        'تعذر عرض نافذة اختيار حساب Google.',
+      _ => 'فشل تسجيل الدخول باستخدام Google.',
+    };
+  }
+
+  void _setError(String message) {
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage = message;
+    });
+  }
+
+  void _openChat() {
+    if (!mounted) return;
+
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const ChatScreen()));
   }
 
   @override
@@ -82,9 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('تسجيل دخول المريض'),
-      ),
+      appBar: AppBar(title: const Text('تسجيل دخول المريض')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -120,6 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 32),
               TextField(
                 controller: _usernameController,
+                enabled: !_isBusy,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'اسم المستخدم',
@@ -129,9 +179,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
+                enabled: !_isBusy,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _login(),
+                onSubmitted: (_) {
+                  if (!_isBusy) {
+                    _login();
+                  }
+                },
                 decoration: const InputDecoration(
                   labelText: 'كلمة المرور',
                   prefixIcon: Icon(Icons.lock_rounded),
@@ -144,9 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEE2E2),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFFCA5A5),
-                    ),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
                   ),
                   child: Text(
                     _errorMessage!,
@@ -160,14 +213,46 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
               ],
               FilledButton(
-                onPressed: _isLoading ? null : _login,
-                child: _isLoading
+                onPressed: _isBusy ? null : _login,
+                child: _isPasswordLoading
                     ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('تسجيل الدخول'),
+              ),
+              const SizedBox(height: 20),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'أو',
+                      style: TextStyle(color: AppTheme.textLight),
+                    ),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: _isBusy ? null : _loginWithGoogle,
+                icon: _isGoogleLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'G',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                label: const Text('المتابعة باستخدام Google'),
               ),
             ],
           ),

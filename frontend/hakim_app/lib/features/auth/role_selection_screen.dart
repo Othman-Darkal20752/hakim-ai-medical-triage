@@ -12,9 +12,7 @@ class RoleSelectionScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.chooseRole),
-      ),
+      appBar: AppBar(title: Text(l10n.chooseRole)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -39,11 +37,9 @@ class RoleSelectionScreen extends StatelessWidget {
               title: l10n.patient,
               subtitle: l10n.patientSubtitle,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
-                  ),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
               },
             ),
 
@@ -54,11 +50,9 @@ class RoleSelectionScreen extends StatelessWidget {
               title: l10n.doctor,
               subtitle: l10n.doctorSubtitle,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.doctorFlowLater),
-                  ),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(l10n.doctorFlowLater)));
               },
             ),
           ],
@@ -100,11 +94,7 @@ class _RoleCard extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                child: Icon(
-                  icon,
-                  color: AppTheme.primary,
-                  size: 30,
-                ),
+                child: Icon(icon, color: AppTheme.primary, size: 30),
               ),
 
               const SizedBox(width: 16),

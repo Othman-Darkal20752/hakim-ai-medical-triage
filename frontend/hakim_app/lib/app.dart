@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/chat/chat_sessions_screen.dart';
-import 'features/onboarding/welcome_screen.dart';
+import 'features/auth/auth_gate.dart';
 import 'l10n/generated/app_localizations.dart';
 
 class HakimApp extends StatelessWidget {
@@ -23,7 +23,7 @@ class HakimApp extends StatelessWidget {
 
       routes: {'/chat-sessions': (_) => const ChatSessionsScreen()},
 
-      home: const WelcomeScreen(),
+      home: const AuthGate(),
     );
   }
 }
