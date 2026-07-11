@@ -24,6 +24,28 @@ ALLOWED_HOSTS = [
 
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
 
+# External AI provider settings.
+# AI integration is disabled by default to prevent accidental API calls.
+AI_ENABLED = os.environ.get('AI_ENABLED', 'false').strip().lower() in {
+    '1',
+    'true',
+    'yes',
+    'on',
+}
+
+AI_PROVIDER = os.environ.get('AI_PROVIDER', 'qwen').strip().lower()
+AI_API_BASE_URL = os.environ.get('AI_API_BASE_URL', '').strip()
+AI_API_KEY = os.environ.get('AI_API_KEY', '').strip()
+AI_MODEL = os.environ.get('AI_MODEL', '').strip()
+
+AI_TIMEOUT_SECONDS = int(
+    os.environ.get('AI_TIMEOUT_SECONDS', '25')
+)
+
+AI_MAX_CONTEXT_MESSAGES = int(
+    os.environ.get('AI_MAX_CONTEXT_MESSAGES', '10')
+)
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
