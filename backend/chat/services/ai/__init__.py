@@ -7,6 +7,10 @@ from .exceptions import (
     AIProviderTimeoutError,
     AIServiceError,
 )
+from .prompt import (
+    MEDICAL_SAFETY_PROMPT_VERSION,
+    build_medical_safety_prompt,
+)
 from .provider import AIMessage, AIProvider, AIProviderResult
 from .qwen_provider import QwenProvider
 
@@ -17,6 +21,8 @@ __all__ = [
     "AIProviderConfig",
     "QwenProvider",
     "load_ai_provider_config",
+    "MEDICAL_SAFETY_PROMPT_VERSION",
+    "build_medical_safety_prompt",
     "AIServiceError",
     "AIIntegrationDisabledError",
     "AIConfigurationError",
