@@ -8,12 +8,14 @@ from .exceptions import (
     AIServiceError,
 )
 from .provider import AIMessage, AIProvider, AIProviderResult
+from .qwen_provider import QwenProvider
 
 __all__ = [
     "AIMessage",
     "AIProvider",
     "AIProviderResult",
     "AIProviderConfig",
+    "QwenProvider",
     "load_ai_provider_config",
     "AIServiceError",
     "AIIntegrationDisabledError",
