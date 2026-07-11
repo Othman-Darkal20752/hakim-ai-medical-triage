@@ -1,12 +1,19 @@
 from dataclasses import FrozenInstanceError
 
 from django.test import SimpleTestCase
+from chat.services.chat_orchestrator import (
+    ChatExecutionPath,
+    ChatOrchestrationResult,
+    orchestrate_chat,
+)
 from chat.services.triage.red_flags.assertion import detect_assertions
 from chat.services.triage.red_flags.pipeline import check_red_flags
 from chat.services.triage.safety_gate import evaluate_chat_safety
 from chat.services.triage.red_flags.response_policy import (
     RESPONSE_POLICY_VERSION,
+    SafetyDecisionReason,
     SafetyDecisionType,
+    StructuredSafetyDecision,
     apply_response_policy,
 )
 from chat.services.triage.red_flags.evaluation import (
@@ -2218,4 +2225,172 @@ class SafetyGateTests(SimpleTestCase):
             evaluate_chat_safety(
                 "I have chest pain.",
                 rule_registry="invalid registry",
+            )
+
+class ChatOrchestratorTests(SimpleTestCase):
+    def _make_urgent_decision(
+        self,
+    ) -> StructuredSafetyDecision:
+        reason = SafetyDecisionReason(
+            rule_id="chat_orchestrator_test_urgent",
+            rule_version=1,
+            urgency=RedFlagUrgency.URGENT,
+            warning_key=(
+                "red_flags.chat_orchestrator_test.urgent"
+            ),
+        )
+
+        return StructuredSafetyDecision(
+            decision=SafetyDecisionType.URGENT,
+            reasons=(reason,),
+            highest_urgency=RedFlagUrgency.URGENT,
+            must_override_model=True,
+            should_short_circuit_llm=False,
+            source_engine_version=(
+                "chat-orchestrator-test-engine-v1"
+            ),
+        )
+
+    def test_continue_routes_to_ai_provider(
+        self,
+    ) -> None:
+        result = orchestrate_chat(
+            "The weather is pleasant today."
+        )
+
+        self.assertEqual(
+            result.execution_path,
+            ChatExecutionPath.AI_PROVIDER,
+        )
+        self.assertTrue(result.should_call_ai_provider)
+        self.assertEqual(
+            result.safety_decision.decision,
+            SafetyDecisionType.CONTINUE,
+        )
+
+    def test_emergency_routes_to_backend_safety_response(
+        self,
+    ) -> None:
+        result = orchestrate_chat(
+            "I have loss of consciousness."
+        )
+
+        self.assertEqual(
+            result.execution_path,
+            ChatExecutionPath.BACKEND_SAFETY_RESPONSE,
+        )
+        self.assertFalse(result.should_call_ai_provider)
+        self.assertEqual(
+            result.safety_decision.decision,
+            SafetyDecisionType.EMERGENCY,
+        )
+        self.assertTrue(
+            result.safety_decision.should_short_circuit_llm
+        )
+
+    def test_injected_urgent_decision_preserves_urgency_floor(
+        self,
+    ) -> None:
+        patient_text = "I have an urgent symptom."
+        expected_decision = self._make_urgent_decision()
+        received_patient_texts: list[str] = []
+
+        def fake_safety_evaluator(
+            received_patient_text: str,
+        ) -> StructuredSafetyDecision:
+            received_patient_texts.append(
+                received_patient_text
+            )
+            return expected_decision
+
+        result = orchestrate_chat(
+            patient_text,
+            safety_evaluator=fake_safety_evaluator,
+        )
+
+        self.assertEqual(
+            received_patient_texts,
+            [patient_text],
+        )
+        self.assertIs(
+            result.safety_decision,
+            expected_decision,
+        )
+        self.assertEqual(
+            result.execution_path,
+            ChatExecutionPath.AI_PROVIDER,
+        )
+        self.assertTrue(result.should_call_ai_provider)
+        self.assertEqual(
+            result.safety_decision.highest_urgency,
+            RedFlagUrgency.URGENT,
+        )
+        self.assertTrue(
+            result.safety_decision.must_override_model
+        )
+
+    def test_result_rejects_inconsistent_execution_path(
+        self,
+    ) -> None:
+        emergency_decision = evaluate_chat_safety(
+            "I have loss of consciousness."
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "execution_path is inconsistent",
+        ):
+            ChatOrchestrationResult(
+                execution_path=(
+                    ChatExecutionPath.AI_PROVIDER
+                ),
+                safety_decision=emergency_decision,
+            )
+
+    def test_result_rejects_invalid_execution_path_type(
+        self,
+    ) -> None:
+        continue_decision = evaluate_chat_safety(
+            "The weather is pleasant today."
+        )
+
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "execution_path must be a "
+                "ChatExecutionPath instance"
+            ),
+        ):
+            ChatOrchestrationResult(
+                execution_path="ai_provider",
+                safety_decision=continue_decision,
+            )
+
+    def test_result_rejects_invalid_safety_decision_type(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "safety_decision must be a "
+                "StructuredSafetyDecision instance"
+            ),
+        ):
+            ChatOrchestrationResult(
+                execution_path=(
+                    ChatExecutionPath.AI_PROVIDER
+                ),
+                safety_decision="invalid decision",
+            )
+
+    def test_result_is_immutable(
+        self,
+    ) -> None:
+        result = orchestrate_chat(
+            "The weather is pleasant today."
+        )
+
+        with self.assertRaises(FrozenInstanceError):
+            result.execution_path = (
+                ChatExecutionPath.BACKEND_SAFETY_RESPONSE
             )
