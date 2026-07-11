@@ -2,6 +2,9 @@ from dataclasses import FrozenInstanceError
 
 from django.test import SimpleTestCase
 from chat.services.triage.red_flags.assertion import detect_assertions
+from chat.services.triage.red_flags.evaluation import (
+    evaluate_red_flag_rules,
+)
 from chat.services.triage.red_flags.concepts import (
     ConceptAlias,
     ConceptLanguage,
@@ -22,6 +25,7 @@ from chat.services.triage.red_flags.rules import (
 )
 from chat.services.triage.red_flags.schemas import (
     AssertionStatus,
+    DetectedLanguage,
     RedFlagUrgency,
 )
 
@@ -904,3 +908,346 @@ class RedFlagRuleSchemaAndRegistryTests(SimpleTestCase):
 
         with self.assertRaises(TypeError):
             registry._rules_by_id["another_rule"] = rule
+class RedFlagRuleEvaluationEngineTests(SimpleTestCase):
+    def _make_requirement(
+        self,
+        concept_code: str,
+        accepted_statuses: tuple[AssertionStatus, ...] = (
+            AssertionStatus.PRESENT,
+        ),
+    ) -> RedFlagEvidenceRequirement:
+        return RedFlagEvidenceRequirement(
+            concept_code=concept_code,
+            accepted_assertion_statuses=accepted_statuses,
+        )
+
+    def _make_rule(
+        self,
+        *,
+        rule_id: str,
+        requirements: tuple[RedFlagEvidenceRequirement, ...],
+        urgency: RedFlagUrgency = RedFlagUrgency.EMERGENCY,
+    ) -> RedFlagRule:
+        return RedFlagRule(
+            rule_id=rule_id,
+            version=1,
+            required_evidence=requirements,
+            urgency=urgency,
+            warning_key=f"red_flags.test.{rule_id}",
+        )
+
+    def _make_registry(
+        self,
+        *rules: RedFlagRule,
+    ) -> RedFlagRuleRegistry:
+        return RedFlagRuleRegistry(
+            rules=rules,
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+    def _evaluate(
+        self,
+        text: str,
+        *rules: RedFlagRule,
+    ):
+        concept_result = match_medical_concepts(text)
+        assertion_result = detect_assertions(concept_result)
+
+        return evaluate_red_flag_rules(
+            assertion_result=assertion_result,
+            rule_registry=self._make_registry(*rules),
+        )
+
+    def test_single_requirement_rule_matches_and_preserves_evidence(
+        self,
+    ) -> None:
+        text = "I have Chest pain."
+
+        rule = self._make_rule(
+            rule_id="single_chest_pain_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+            ),
+        )
+
+        result = self._evaluate(text, rule)
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.ENGLISH,
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(result.must_override_model)
+        self.assertTrue(result.should_short_circuit_llm)
+        self.assertEqual(len(result.matches), 1)
+
+        rule_match = result.matches[0]
+
+        self.assertEqual(
+            rule_match.rule_id,
+            "single_chest_pain_rule",
+        )
+        self.assertEqual(rule_match.rule_version, 1)
+        self.assertEqual(len(rule_match.evidence), 1)
+
+        evidence = rule_match.evidence[0]
+        expected_start = text.index("Chest pain")
+        expected_end = expected_start + len("Chest pain")
+
+        self.assertEqual(evidence.concept_code, "chest_pain")
+        self.assertEqual(evidence.matched_text, "Chest pain")
+        self.assertEqual(
+            evidence.assertion,
+            AssertionStatus.PRESENT,
+        )
+        self.assertEqual(evidence.start_char, expected_start)
+        self.assertEqual(evidence.end_char, expected_end)
+        self.assertEqual(evidence.segment_index, 0)
+        self.assertEqual(
+            text[evidence.start_char:evidence.end_char],
+            evidence.matched_text,
+        )
+
+    def test_rule_uses_and_semantics_for_all_requirements(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            rule_id="chest_pain_with_breathing_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = self._evaluate(
+            "I have chest pain and shortness of breath.",
+            rule,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(len(result.matches), 1)
+        self.assertEqual(
+            tuple(
+                evidence.concept_code
+                for evidence in result.matches[0].evidence
+            ),
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+
+    def test_rule_does_not_match_when_requirement_is_missing(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            rule_id="missing_breathing_evidence_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = self._evaluate(
+            "I have chest pain.",
+            rule,
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+        self.assertIsNone(result.highest_urgency)
+        self.assertFalse(result.must_override_model)
+        self.assertFalse(result.should_short_circuit_llm)
+
+    def test_negated_evidence_does_not_satisfy_present_requirement(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            rule_id="negated_breathing_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = self._evaluate(
+            (
+                "I have chest pain but I do not have "
+                "shortness of breath."
+            ),
+            rule,
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+
+    def test_requirement_uses_configured_assertion_statuses(
+        self,
+    ) -> None:
+        test_only_rule = self._make_rule(
+            rule_id="test_negated_status_rule",
+            requirements=(
+                self._make_requirement(
+                    "chest_pain",
+                    accepted_statuses=(
+                        AssertionStatus.NEGATED,
+                    ),
+                ),
+            ),
+            urgency=RedFlagUrgency.URGENT,
+        )
+
+        result = self._evaluate(
+            "I do not have chest pain.",
+            test_only_rule,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            result.matches[0].evidence[0].assertion,
+            AssertionStatus.NEGATED,
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.URGENT,
+        )
+        self.assertFalse(result.should_short_circuit_llm)
+
+    def test_multiple_rules_match_in_registry_order(
+        self,
+    ) -> None:
+        breathing_rule = self._make_rule(
+            rule_id="first_breathing_rule",
+            requirements=(
+                self._make_requirement("shortness_of_breath"),
+            ),
+            urgency=RedFlagUrgency.URGENT,
+        )
+
+        chest_rule = self._make_rule(
+            rule_id="second_chest_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+            ),
+            urgency=RedFlagUrgency.EMERGENCY,
+        )
+
+        result = self._evaluate(
+            "I have chest pain and shortness of breath.",
+            breathing_rule,
+            chest_rule,
+        )
+
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            (
+                "first_breathing_rule",
+                "second_chest_rule",
+            ),
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+
+    def test_duplicate_occurrences_produce_one_evidence_item(
+        self,
+    ) -> None:
+        text = "Chest pain, then chest pain."
+
+        rule = self._make_rule(
+            rule_id="duplicate_chest_occurrence_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+            ),
+        )
+
+        result = self._evaluate(text, rule)
+
+        self.assertTrue(result.matched)
+        self.assertEqual(len(result.matches[0].evidence), 1)
+
+        evidence = result.matches[0].evidence[0]
+
+        self.assertEqual(evidence.matched_text, "Chest pain")
+        self.assertEqual(evidence.start_char, 0)
+        self.assertEqual(evidence.end_char, len("Chest pain"))
+
+    def test_mixed_language_is_detected_deterministically(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            rule_id="mixed_language_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = self._evaluate(
+            (
+                f"{ARABIC_CHEST_PAIN} "
+                "and shortness of breath."
+            ),
+            rule,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.MIXED,
+        )
+
+    def test_unknown_language_when_no_concepts_are_matched(
+        self,
+    ) -> None:
+        result = self._evaluate(
+            "The sky is blue.",
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.UNKNOWN,
+        )
+
+    def test_invalid_assertion_result_type_is_rejected(
+        self,
+    ) -> None:
+        registry = self._make_registry()
+
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "assertion_result must be an "
+                "AssertionDetectionResult instance"
+            ),
+        ):
+            evaluate_red_flag_rules(
+                assertion_result="invalid assertion result",
+                rule_registry=registry,
+            )
+
+    def test_invalid_rule_registry_type_is_rejected(
+        self,
+    ) -> None:
+        assertion_result = detect_assertions(
+            match_medical_concepts("I have chest pain.")
+        )
+
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "rule_registry must be a "
+                "RedFlagRuleRegistry instance"
+            ),
+        ):
+            evaluate_red_flag_rules(
+                assertion_result=assertion_result,
+                rule_registry="invalid registry",
+            )
