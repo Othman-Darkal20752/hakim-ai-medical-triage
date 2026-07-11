@@ -6,6 +6,12 @@ from chat.services.triage.red_flags.pipeline import check_red_flags
 from chat.services.triage.red_flags.evaluation import (
     evaluate_red_flag_rules,
 )
+from chat.services.triage.red_flags.rulebook import (
+    APPROVED_RED_FLAG_RULES,
+    CHEST_PAIN_WITH_SHORTNESS_OF_BREATH_EMERGENCY,
+    LOSS_OF_CONSCIOUSNESS_EMERGENCY,
+    RED_FLAG_RULE_REGISTRY,
+)
 from chat.services.triage.red_flags.concepts import (
     ConceptAlias,
     ConceptLanguage,
@@ -39,6 +45,11 @@ ARABIC_CHEST_PAIN = (
 ARABIC_SHORTNESS_OF_BREATH = (
     "\u0636\u064a\u0642 "
     "\u0627\u0644\u062a\u0646\u0641\u0633"
+)
+
+ARABIC_LOSS_OF_CONSCIOUSNESS = (
+    "\u0641\u0642\u062f\u0627\u0646 "
+    "\u0627\u0644\u0648\u0639\u064a"
 )
 
 
@@ -909,6 +920,8 @@ class RedFlagRuleSchemaAndRegistryTests(SimpleTestCase):
 
         with self.assertRaises(TypeError):
             registry._rules_by_id["another_rule"] = rule
+
+
 class RedFlagRuleEvaluationEngineTests(SimpleTestCase):
     def _make_requirement(
         self,
@@ -1471,3 +1484,275 @@ class RedFlagPipelineIntegrationTests(SimpleTestCase):
                 "I have chest pain.",
                 rule_registry="invalid registry",
             )
+
+class ProductionRedFlagRulebookTests(SimpleTestCase):
+    def test_registry_contains_approved_rules_in_stable_order(
+        self,
+    ) -> None:
+        self.assertEqual(
+            APPROVED_RED_FLAG_RULES,
+            (
+                LOSS_OF_CONSCIOUSNESS_EMERGENCY,
+                CHEST_PAIN_WITH_SHORTNESS_OF_BREATH_EMERGENCY,
+            ),
+        )
+
+        self.assertEqual(
+            RED_FLAG_RULE_REGISTRY.rule_ids,
+            (
+                "loss_of_consciousness_emergency",
+                (
+                    "chest_pain_with_"
+                    "shortness_of_breath_emergency"
+                ),
+            ),
+        )
+
+        self.assertIs(
+            RED_FLAG_RULE_REGISTRY.concept_registry,
+            CONCEPT_LEXICON,
+        )
+
+    def test_loss_of_consciousness_rule_definition(
+        self,
+    ) -> None:
+        rule = LOSS_OF_CONSCIOUSNESS_EMERGENCY
+
+        self.assertEqual(
+            rule.rule_id,
+            "loss_of_consciousness_emergency",
+        )
+        self.assertEqual(rule.version, 1)
+        self.assertEqual(
+            rule.urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertEqual(
+            rule.warning_key,
+            "red_flags.loss_of_consciousness_emergency",
+        )
+        self.assertEqual(len(rule.required_evidence), 1)
+
+        requirement = rule.required_evidence[0]
+
+        self.assertEqual(
+            requirement.concept_code,
+            "loss_of_consciousness",
+        )
+        self.assertEqual(
+            requirement.accepted_assertion_statuses,
+            (AssertionStatus.PRESENT,),
+        )
+
+    def test_chest_pain_with_breathing_rule_definition(
+        self,
+    ) -> None:
+        rule = (
+            CHEST_PAIN_WITH_SHORTNESS_OF_BREATH_EMERGENCY
+        )
+
+        self.assertEqual(
+            rule.rule_id,
+            (
+                "chest_pain_with_"
+                "shortness_of_breath_emergency"
+            ),
+        )
+        self.assertEqual(rule.version, 1)
+        self.assertEqual(
+            rule.urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertEqual(
+            rule.warning_key,
+            (
+                "red_flags."
+                "chest_pain_with_shortness_of_breath_emergency"
+            ),
+        )
+        self.assertEqual(
+            tuple(
+                requirement.concept_code
+                for requirement in rule.required_evidence
+            ),
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+
+        for requirement in rule.required_evidence:
+            self.assertEqual(
+                requirement.accepted_assertion_statuses,
+                (AssertionStatus.PRESENT,),
+            )
+
+    def test_english_loss_of_consciousness_matches(
+        self,
+    ) -> None:
+        text = "I have loss of consciousness."
+
+        result = check_red_flags(
+            text,
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            ("loss_of_consciousness_emergency",),
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(result.must_override_model)
+        self.assertTrue(result.should_short_circuit_llm)
+
+        evidence = result.matches[0].evidence[0]
+
+        self.assertEqual(
+            evidence.concept_code,
+            "loss_of_consciousness",
+        )
+        self.assertEqual(
+            evidence.matched_text,
+            "loss of consciousness",
+        )
+        self.assertEqual(
+            evidence.assertion,
+            AssertionStatus.PRESENT,
+        )
+        self.assertEqual(
+            text[evidence.start_char:evidence.end_char],
+            evidence.matched_text,
+        )
+
+    def test_arabic_loss_of_consciousness_matches(
+        self,
+    ) -> None:
+        text = (
+            "\u0639\u0646\u062f\u064a "
+            f"{ARABIC_LOSS_OF_CONSCIOUSNESS}"
+        )
+
+        result = check_red_flags(
+            text,
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            ("loss_of_consciousness_emergency",),
+        )
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.ARABIC,
+        )
+
+        evidence = result.matches[0].evidence[0]
+
+        self.assertEqual(
+            evidence.matched_text,
+            ARABIC_LOSS_OF_CONSCIOUSNESS,
+        )
+        self.assertEqual(
+            evidence.assertion,
+            AssertionStatus.PRESENT,
+        )
+
+    def test_negated_loss_of_consciousness_does_not_match(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            "I do not have loss of consciousness.",
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+        self.assertIsNone(result.highest_urgency)
+        self.assertFalse(result.must_override_model)
+
+    def test_chest_pain_with_shortness_of_breath_matches(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            "I have chest pain and shortness of breath.",
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            (
+                (
+                    "chest_pain_with_"
+                    "shortness_of_breath_emergency"
+                ),
+            ),
+        )
+        self.assertEqual(
+            tuple(
+                evidence.concept_code
+                for evidence in result.matches[0].evidence
+            ),
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+
+    def test_combination_rule_requires_both_concepts(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            "I have chest pain.",
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+
+    def test_negated_combination_evidence_prevents_match(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            (
+                "I have chest pain but I do not have "
+                "shortness of breath."
+            ),
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+
+    def test_multiple_production_rules_match_in_registry_order(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            (
+                "I have loss of consciousness, chest pain, "
+                "and shortness of breath."
+            ),
+            rule_registry=RED_FLAG_RULE_REGISTRY,
+        )
+
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            (
+                "loss_of_consciousness_emergency",
+                (
+                    "chest_pain_with_"
+                    "shortness_of_breath_emergency"
+                ),
+            ),
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(result.must_override_model)
+        self.assertTrue(result.should_short_circuit_llm)
