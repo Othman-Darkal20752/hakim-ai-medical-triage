@@ -3,6 +3,11 @@ from dataclasses import FrozenInstanceError
 from django.test import SimpleTestCase
 from chat.services.triage.red_flags.assertion import detect_assertions
 from chat.services.triage.red_flags.pipeline import check_red_flags
+from chat.services.triage.red_flags.response_policy import (
+    RESPONSE_POLICY_VERSION,
+    SafetyDecisionType,
+    apply_response_policy,
+)
 from chat.services.triage.red_flags.evaluation import (
     evaluate_red_flag_rules,
 )
@@ -1756,3 +1761,310 @@ class ProductionRedFlagRulebookTests(SimpleTestCase):
         )
         self.assertTrue(result.must_override_model)
         self.assertTrue(result.should_short_circuit_llm)
+
+class ResponsePolicyTests(SimpleTestCase):
+    def _make_requirement(
+        self,
+        concept_code: str,
+    ) -> RedFlagEvidenceRequirement:
+        return RedFlagEvidenceRequirement(
+            concept_code=concept_code,
+            accepted_assertion_statuses=(
+                AssertionStatus.PRESENT,
+            ),
+        )
+
+    def _make_rule(
+        self,
+        *,
+        rule_id: str,
+        concept_code: str,
+        urgency: RedFlagUrgency,
+    ) -> RedFlagRule:
+        return RedFlagRule(
+            rule_id=rule_id,
+            version=1,
+            required_evidence=(
+                self._make_requirement(concept_code),
+            ),
+            urgency=urgency,
+            warning_key=(
+                f"red_flags.response_policy_test.{rule_id}"
+            ),
+        )
+
+    def _make_registry(
+        self,
+        *rules: RedFlagRule,
+    ) -> RedFlagRuleRegistry:
+        return RedFlagRuleRegistry(
+            rules=rules,
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+    def test_no_match_returns_continue_decision(
+        self,
+    ) -> None:
+        red_flag_result = check_red_flags(
+            "The weather is pleasant today.",
+            rule_registry=self._make_registry(),
+        )
+
+        decision = apply_response_policy(
+            red_flag_result
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.CONTINUE,
+        )
+        self.assertEqual(decision.reasons, ())
+        self.assertIsNone(decision.highest_urgency)
+        self.assertFalse(decision.must_override_model)
+        self.assertFalse(
+            decision.should_short_circuit_llm
+        )
+        self.assertEqual(decision.warning_keys, ())
+        self.assertIsNone(
+            decision.primary_warning_key
+        )
+        self.assertEqual(
+            decision.source_engine_version,
+            red_flag_result.engine_version,
+        )
+        self.assertEqual(
+            decision.policy_version,
+            RESPONSE_POLICY_VERSION,
+        )
+
+    def test_urgent_match_returns_urgent_decision(
+        self,
+    ) -> None:
+        urgent_rule = self._make_rule(
+            rule_id="urgent_chest_pain_rule",
+            concept_code="chest_pain",
+            urgency=RedFlagUrgency.URGENT,
+        )
+
+        red_flag_result = check_red_flags(
+            "I have chest pain.",
+            rule_registry=self._make_registry(
+                urgent_rule
+            ),
+        )
+
+        decision = apply_response_policy(
+            red_flag_result
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.URGENT,
+        )
+        self.assertEqual(
+            decision.highest_urgency,
+            RedFlagUrgency.URGENT,
+        )
+        self.assertTrue(
+            decision.must_override_model
+        )
+        self.assertFalse(
+            decision.should_short_circuit_llm
+        )
+        self.assertEqual(len(decision.reasons), 1)
+        self.assertEqual(
+            decision.reasons[0].rule_id,
+            "urgent_chest_pain_rule",
+        )
+        self.assertEqual(
+            decision.primary_warning_key,
+            (
+                "red_flags.response_policy_test."
+                "urgent_chest_pain_rule"
+            ),
+        )
+
+    def test_emergency_match_short_circuits_llm(
+        self,
+    ) -> None:
+        emergency_rule = self._make_rule(
+            rule_id="emergency_breathing_rule",
+            concept_code="shortness_of_breath",
+            urgency=RedFlagUrgency.EMERGENCY,
+        )
+
+        red_flag_result = check_red_flags(
+            "I have shortness of breath.",
+            rule_registry=self._make_registry(
+                emergency_rule
+            ),
+        )
+
+        decision = apply_response_policy(
+            red_flag_result
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.EMERGENCY,
+        )
+        self.assertEqual(
+            decision.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(
+            decision.must_override_model
+        )
+        self.assertTrue(
+            decision.should_short_circuit_llm
+        )
+        self.assertEqual(
+            decision.reasons[0].urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+
+    def test_multiple_matches_preserve_all_reasons(
+        self,
+    ) -> None:
+        urgent_rule = self._make_rule(
+            rule_id="z_urgent_chest_rule",
+            concept_code="chest_pain",
+            urgency=RedFlagUrgency.URGENT,
+        )
+        emergency_rule = self._make_rule(
+            rule_id="a_emergency_breathing_rule",
+            concept_code="shortness_of_breath",
+            urgency=RedFlagUrgency.EMERGENCY,
+        )
+
+        red_flag_result = check_red_flags(
+            "I have chest pain and shortness of breath.",
+            rule_registry=self._make_registry(
+                urgent_rule,
+                emergency_rule,
+            ),
+        )
+
+        decision = apply_response_policy(
+            red_flag_result
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.EMERGENCY,
+        )
+        self.assertEqual(
+            tuple(
+                reason.rule_id
+                for reason in decision.reasons
+            ),
+            (
+                "a_emergency_breathing_rule",
+                "z_urgent_chest_rule",
+            ),
+        )
+        self.assertEqual(
+            tuple(
+                reason.urgency
+                for reason in decision.reasons
+            ),
+            (
+                RedFlagUrgency.EMERGENCY,
+                RedFlagUrgency.URGENT,
+            ),
+        )
+        self.assertEqual(
+            decision.primary_warning_key,
+            (
+                "red_flags.response_policy_test."
+                "a_emergency_breathing_rule"
+            ),
+        )
+
+    def test_match_order_does_not_change_decision_output(
+        self,
+    ) -> None:
+        z_rule = self._make_rule(
+            rule_id="z_urgent_rule",
+            concept_code="chest_pain",
+            urgency=RedFlagUrgency.URGENT,
+        )
+        a_rule = self._make_rule(
+            rule_id="a_urgent_rule",
+            concept_code="shortness_of_breath",
+            urgency=RedFlagUrgency.URGENT,
+        )
+
+        text = (
+            "I have chest pain and "
+            "shortness of breath."
+        )
+
+        first_result = check_red_flags(
+            text,
+            rule_registry=self._make_registry(
+                z_rule,
+                a_rule,
+            ),
+        )
+        second_result = check_red_flags(
+            text,
+            rule_registry=self._make_registry(
+                a_rule,
+                z_rule,
+            ),
+        )
+
+        first_decision = apply_response_policy(
+            first_result
+        )
+        second_decision = apply_response_policy(
+            second_result
+        )
+
+        self.assertEqual(
+            first_decision,
+            second_decision,
+        )
+        self.assertEqual(
+            tuple(
+                reason.rule_id
+                for reason in first_decision.reasons
+            ),
+            (
+                "a_urgent_rule",
+                "z_urgent_rule",
+            ),
+        )
+
+    def test_invalid_input_is_rejected(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "red_flag_result must be a "
+                "RedFlagCheckResult instance"
+            ),
+        ):
+            apply_response_policy(
+                "invalid result"
+            )
+
+    def test_structured_decision_is_immutable(
+        self,
+    ) -> None:
+        red_flag_result = check_red_flags(
+            "No relevant symptoms.",
+            rule_registry=self._make_registry(),
+        )
+        decision = apply_response_policy(
+            red_flag_result
+        )
+
+        with self.assertRaises(
+            FrozenInstanceError
+        ):
+            decision.decision = (
+                SafetyDecisionType.EMERGENCY
+            )
