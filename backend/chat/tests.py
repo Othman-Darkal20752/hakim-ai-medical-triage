@@ -2,6 +2,7 @@ from dataclasses import FrozenInstanceError
 
 from django.test import SimpleTestCase
 from chat.services.triage.red_flags.assertion import detect_assertions
+from chat.services.triage.red_flags.pipeline import check_red_flags
 from chat.services.triage.red_flags.evaluation import (
     evaluate_red_flag_rules,
 )
@@ -1249,5 +1250,224 @@ class RedFlagRuleEvaluationEngineTests(SimpleTestCase):
         ):
             evaluate_red_flag_rules(
                 assertion_result=assertion_result,
+                rule_registry="invalid registry",
+            )
+
+class RedFlagPipelineIntegrationTests(SimpleTestCase):
+    def _make_requirement(
+        self,
+        concept_code: str,
+        accepted_statuses: tuple[AssertionStatus, ...] = (
+            AssertionStatus.PRESENT,
+        ),
+    ) -> RedFlagEvidenceRequirement:
+        return RedFlagEvidenceRequirement(
+            concept_code=concept_code,
+            accepted_assertion_statuses=accepted_statuses,
+        )
+
+    def _make_rule(
+        self,
+        *,
+        rule_id: str,
+        requirements: tuple[RedFlagEvidenceRequirement, ...],
+        urgency: RedFlagUrgency = RedFlagUrgency.EMERGENCY,
+    ) -> RedFlagRule:
+        return RedFlagRule(
+            rule_id=rule_id,
+            version=1,
+            required_evidence=requirements,
+            urgency=urgency,
+            warning_key=f"red_flags.pipeline_test.{rule_id}",
+        )
+
+    def _make_registry(
+        self,
+        *rules: RedFlagRule,
+    ) -> RedFlagRuleRegistry:
+        return RedFlagRuleRegistry(
+            rules=rules,
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+    def test_pipeline_matches_rule_from_raw_patient_text(
+        self,
+    ) -> None:
+        text = "I have chest pain and shortness of breath."
+
+        rule = self._make_rule(
+            rule_id="pipeline_chest_breathing_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = check_red_flags(
+            text,
+            rule_registry=self._make_registry(rule),
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(len(result.matches), 1)
+        self.assertEqual(
+            result.matches[0].rule_id,
+            "pipeline_chest_breathing_rule",
+        )
+        self.assertEqual(
+            tuple(
+                evidence.concept_code
+                for evidence in result.matches[0].evidence
+            ),
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.ENGLISH,
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(result.must_override_model)
+        self.assertTrue(result.should_short_circuit_llm)
+
+    def test_pipeline_does_not_match_negated_required_evidence(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            rule_id="pipeline_negated_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+                self._make_requirement("shortness_of_breath"),
+            ),
+        )
+
+        result = check_red_flags(
+            (
+                "I have chest pain but I do not have "
+                "shortness of breath."
+            ),
+            rule_registry=self._make_registry(rule),
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+        self.assertIsNone(result.highest_urgency)
+        self.assertFalse(result.must_override_model)
+
+    def test_pipeline_preserves_original_text_and_offsets(
+        self,
+    ) -> None:
+        text = "Today I have Chest pain."
+
+        rule = self._make_rule(
+            rule_id="pipeline_offsets_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+            ),
+        )
+
+        result = check_red_flags(
+            text,
+            rule_registry=self._make_registry(rule),
+        )
+
+        evidence = result.matches[0].evidence[0]
+        expected_start = text.index("Chest pain")
+        expected_end = expected_start + len("Chest pain")
+
+        self.assertEqual(evidence.matched_text, "Chest pain")
+        self.assertEqual(evidence.start_char, expected_start)
+        self.assertEqual(evidence.end_char, expected_end)
+        self.assertEqual(
+            text[evidence.start_char:evidence.end_char],
+            evidence.matched_text,
+        )
+
+    def test_pipeline_supports_multiple_matches_in_registry_order(
+        self,
+    ) -> None:
+        chest_rule = self._make_rule(
+            rule_id="pipeline_first_chest_rule",
+            requirements=(
+                self._make_requirement("chest_pain"),
+            ),
+            urgency=RedFlagUrgency.URGENT,
+        )
+
+        breathing_rule = self._make_rule(
+            rule_id="pipeline_second_breathing_rule",
+            requirements=(
+                self._make_requirement("shortness_of_breath"),
+            ),
+            urgency=RedFlagUrgency.EMERGENCY,
+        )
+
+        result = check_red_flags(
+            "I have chest pain and shortness of breath.",
+            rule_registry=self._make_registry(
+                chest_rule,
+                breathing_rule,
+            ),
+        )
+
+        self.assertEqual(
+            tuple(match.rule_id for match in result.matches),
+            (
+                "pipeline_first_chest_rule",
+                "pipeline_second_breathing_rule",
+            ),
+        )
+        self.assertEqual(
+            result.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+
+    def test_pipeline_returns_structured_empty_result(
+        self,
+    ) -> None:
+        result = check_red_flags(
+            "The weather is pleasant today.",
+            rule_registry=self._make_registry(),
+        )
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.matches, ())
+        self.assertEqual(
+            result.language,
+            DetectedLanguage.UNKNOWN,
+        )
+        self.assertIsNone(result.highest_urgency)
+        self.assertFalse(result.must_override_model)
+        self.assertFalse(result.should_short_circuit_llm)
+
+    def test_pipeline_rejects_non_string_patient_text(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "patient_text must be a string",
+        ):
+            check_red_flags(
+                123,
+                rule_registry=self._make_registry(),
+            )
+
+    def test_pipeline_rejects_invalid_rule_registry(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "rule_registry must be a "
+                "RedFlagRuleRegistry instance"
+            ),
+        ):
+            check_red_flags(
+                "I have chest pain.",
                 rule_registry="invalid registry",
             )
