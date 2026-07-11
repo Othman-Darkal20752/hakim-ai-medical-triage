@@ -5,7 +5,24 @@ from chat.services.triage.red_flags.concepts import (
     ConceptLanguage,
     MedicalConcept,
 )
+from chat.services.triage.red_flags.lexicon import (
+    APPROVED_CONCEPTS,
+    CONCEPT_LEXICON,
+    LEXICON_VERSION,
+)
+from chat.services.triage.red_flags.normalization import normalize_text
 from chat.services.triage.red_flags.registry import ConceptLexiconRegistry
+
+
+ARABIC_CHEST_PAIN = (
+    "\u0627\u0644\u0645 \u0641\u064a "
+    "\u0627\u0644\u0635\u062f\u0631"
+)
+
+ARABIC_SHORTNESS_OF_BREATH = (
+    "\u0636\u064a\u0642 "
+    "\u0627\u0644\u062a\u0646\u0641\u0633"
+)
 
 
 class ConceptLexiconRegistryTests(SimpleTestCase):
@@ -14,7 +31,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             code="chest_pain",
             aliases=(
                 ConceptAlias(
-                    text="الم صدر",
+                    text=ARABIC_CHEST_PAIN,
                     language=ConceptLanguage.ARABIC,
                 ),
                 ConceptAlias(
@@ -28,7 +45,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             code="shortness_of_breath",
             aliases=(
                 ConceptAlias(
-                    text="ضيق تنفس",
+                    text=ARABIC_SHORTNESS_OF_BREATH,
                     language=ConceptLanguage.ARABIC,
                 ),
                 ConceptAlias(
@@ -59,7 +76,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
         self.assertIs(
             registry.concept_for_alias(
                 ConceptLanguage.ARABIC,
-                "الم صدر",
+                ARABIC_CHEST_PAIN,
             ),
             chest_pain,
         )
@@ -84,7 +101,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             code="chest_pain",
             aliases=(
                 ConceptAlias(
-                    text="الم صدر",
+                    text=ARABIC_CHEST_PAIN,
                     language=ConceptLanguage.ARABIC,
                 ),
             ),
@@ -113,7 +130,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             code="chest_pain",
             aliases=(
                 ConceptAlias(
-                    text="الم صدر",
+                    text=ARABIC_CHEST_PAIN,
                     language=ConceptLanguage.ARABIC,
                 ),
             ),
@@ -123,24 +140,26 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             code="cardiac_discomfort",
             aliases=(
                 ConceptAlias(
-                    text="الم صدر",
+                    text=ARABIC_CHEST_PAIN,
                     language=ConceptLanguage.ARABIC,
                 ),
             ),
         )
 
-        with self.assertRaisesRegex(
-            ValueError,
-            (
-                r"alias conflict detected: "
-                r"'الم صدر' in language 'ar' "
-                r"is assigned to both "
-                r"'chest_pain' and 'cardiac_discomfort'"
-            ),
-        ):
+        with self.assertRaises(ValueError) as context:
             ConceptLexiconRegistry(
                 concepts=(first_concept, second_concept),
             )
+
+        self.assertEqual(
+            str(context.exception),
+            (
+                "alias conflict detected: "
+                f"{ARABIC_CHEST_PAIN!r} in language 'ar' "
+                "is assigned to both "
+                "'chest_pain' and 'cardiac_discomfort'"
+            ),
+        )
 
     def test_identical_alias_is_allowed_across_languages(self) -> None:
         arabic_concept = MedicalConcept(
@@ -201,6 +220,7 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             ConceptLexiconRegistry(
                 concepts=[concept],
             )
+
     def test_invalid_registry_item_is_rejected(self) -> None:
         with self.assertRaisesRegex(
             TypeError,
@@ -209,3 +229,64 @@ class ConceptLexiconRegistryTests(SimpleTestCase):
             ConceptLexiconRegistry(
                 concepts=("not_a_medical_concept",),
             )
+
+
+class MedicalConceptLexiconTests(SimpleTestCase):
+    def test_lexicon_version_and_registry_size(self) -> None:
+        self.assertEqual(LEXICON_VERSION, "1.1.0")
+        self.assertEqual(len(APPROVED_CONCEPTS), 3)
+        self.assertEqual(len(CONCEPT_LEXICON), 3)
+        self.assertEqual(
+            CONCEPT_LEXICON.concepts,
+            APPROVED_CONCEPTS,
+        )
+
+    def test_lexicon_supports_code_and_exact_alias_lookup(self) -> None:
+        self.assertEqual(
+            CONCEPT_LEXICON.require("chest_pain").code,
+            "chest_pain",
+        )
+
+        arabic_result = CONCEPT_LEXICON.concept_for_alias(
+            ConceptLanguage.ARABIC,
+            ARABIC_CHEST_PAIN,
+        )
+
+        english_result = CONCEPT_LEXICON.concept_for_alias(
+            ConceptLanguage.ENGLISH,
+            "difficulty breathing",
+        )
+
+        self.assertIsNotNone(arabic_result)
+        self.assertIsNotNone(english_result)
+
+        self.assertEqual(
+            arabic_result.code,
+            "chest_pain",
+        )
+        self.assertEqual(
+            english_result.code,
+            "shortness_of_breath",
+        )
+
+    def test_every_approved_concept_has_bilingual_aliases(self) -> None:
+        for concept in APPROVED_CONCEPTS:
+            with self.subTest(concept=concept.code):
+                self.assertTrue(
+                    concept.aliases_for(ConceptLanguage.ARABIC),
+                )
+                self.assertTrue(
+                    concept.aliases_for(ConceptLanguage.ENGLISH),
+                )
+
+    def test_every_approved_alias_is_pre_normalized(self) -> None:
+        for concept in APPROVED_CONCEPTS:
+            for alias in concept.aliases:
+                with self.subTest(
+                    concept=concept.code,
+                    alias=ascii(alias.text),
+                ):
+                    self.assertEqual(
+                        normalize_text(alias.text).normalized,
+                        alias.text,
+                    )
