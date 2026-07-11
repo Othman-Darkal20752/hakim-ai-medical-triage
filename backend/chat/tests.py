@@ -3,6 +3,7 @@ from dataclasses import FrozenInstanceError
 from django.test import SimpleTestCase
 from chat.services.triage.red_flags.assertion import detect_assertions
 from chat.services.triage.red_flags.pipeline import check_red_flags
+from chat.services.triage.safety_gate import evaluate_chat_safety
 from chat.services.triage.red_flags.response_policy import (
     RESPONSE_POLICY_VERSION,
     SafetyDecisionType,
@@ -2067,4 +2068,154 @@ class ResponsePolicyTests(SimpleTestCase):
         ):
             decision.decision = (
                 SafetyDecisionType.EMERGENCY
+            )
+
+
+class SafetyGateTests(SimpleTestCase):
+    def _make_urgent_registry(
+        self,
+    ) -> RedFlagRuleRegistry:
+        urgent_rule = RedFlagRule(
+            rule_id="safety_gate_urgent_chest_pain",
+            version=1,
+            required_evidence=(
+                RedFlagEvidenceRequirement(
+                    concept_code="chest_pain",
+                    accepted_assertion_statuses=(
+                        AssertionStatus.PRESENT,
+                    ),
+                ),
+            ),
+            urgency=RedFlagUrgency.URGENT,
+            warning_key=(
+                "red_flags.safety_gate_test."
+                "urgent_chest_pain"
+            ),
+        )
+
+        return RedFlagRuleRegistry(
+            rules=(urgent_rule,),
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+    def test_default_registry_returns_continue_decision(
+        self,
+    ) -> None:
+        decision = evaluate_chat_safety(
+            "The weather is pleasant today."
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.CONTINUE,
+        )
+        self.assertEqual(decision.reasons, ())
+        self.assertIsNone(decision.highest_urgency)
+        self.assertFalse(decision.must_override_model)
+        self.assertFalse(
+            decision.should_short_circuit_llm
+        )
+        self.assertIsNone(
+            decision.primary_warning_key
+        )
+
+    def test_default_registry_returns_emergency_decision(
+        self,
+    ) -> None:
+        decision = evaluate_chat_safety(
+            "I have loss of consciousness."
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.EMERGENCY,
+        )
+        self.assertEqual(
+            decision.highest_urgency,
+            RedFlagUrgency.EMERGENCY,
+        )
+        self.assertTrue(decision.must_override_model)
+        self.assertTrue(
+            decision.should_short_circuit_llm
+        )
+        self.assertEqual(
+            decision.primary_warning_key,
+            "red_flags.loss_of_consciousness_emergency",
+        )
+
+    def test_custom_registry_can_be_injected(
+        self,
+    ) -> None:
+        decision = evaluate_chat_safety(
+            "I have chest pain.",
+            rule_registry=self._make_urgent_registry(),
+        )
+
+        self.assertEqual(
+            decision.decision,
+            SafetyDecisionType.URGENT,
+        )
+        self.assertEqual(
+            decision.highest_urgency,
+            RedFlagUrgency.URGENT,
+        )
+        self.assertTrue(decision.must_override_model)
+        self.assertFalse(
+            decision.should_short_circuit_llm
+        )
+        self.assertEqual(
+            decision.primary_warning_key,
+            (
+                "red_flags.safety_gate_test."
+                "urgent_chest_pain"
+            ),
+        )
+
+    def test_result_does_not_expose_raw_evidence(
+        self,
+    ) -> None:
+        decision = evaluate_chat_safety(
+            "I have loss of consciousness."
+        )
+
+        self.assertFalse(
+            hasattr(decision, "matches")
+        )
+        self.assertFalse(
+            hasattr(decision, "evidence")
+        )
+        self.assertFalse(
+            hasattr(decision, "matched_text")
+        )
+
+        for reason in decision.reasons:
+            self.assertFalse(
+                hasattr(reason, "evidence")
+            )
+            self.assertFalse(
+                hasattr(reason, "matched_text")
+            )
+
+    def test_invalid_patient_text_is_rejected(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "patient_text must be a string",
+        ):
+            evaluate_chat_safety(123)
+
+    def test_invalid_rule_registry_is_rejected(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "rule_registry must be a "
+                "RedFlagRuleRegistry instance"
+            ),
+        ):
+            evaluate_chat_safety(
+                "I have chest pain.",
+                rule_registry="invalid registry",
             )
