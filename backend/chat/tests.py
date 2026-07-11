@@ -10,6 +10,7 @@ from chat.services.triage.red_flags.lexicon import (
     CONCEPT_LEXICON,
     LEXICON_VERSION,
 )
+from chat.services.triage.red_flags.matching import match_medical_concepts
 from chat.services.triage.red_flags.normalization import normalize_text
 from chat.services.triage.red_flags.registry import ConceptLexiconRegistry
 
@@ -290,3 +291,193 @@ class MedicalConceptLexiconTests(SimpleTestCase):
                         normalize_text(alias.text).normalized,
                         alias.text,
                     )
+
+
+class MedicalConceptMatchingTests(SimpleTestCase):
+    def test_english_matches_respect_boundaries_and_original_offsets(
+        self,
+    ) -> None:
+        text = "Chest pain, chest painx, and (chest pain)."
+
+        result = match_medical_concepts(text)
+
+        self.assertEqual(
+            result.normalized_text,
+            "chest pain, chest painx, and (chest pain).",
+        )
+        self.assertTrue(result.has_matches)
+        self.assertEqual(len(result.matches), 2)
+
+        first_match, second_match = result.matches
+
+        self.assertEqual(
+            first_match.concept_code,
+            "chest_pain",
+        )
+        self.assertEqual(
+            first_match.language,
+            ConceptLanguage.ENGLISH,
+        )
+        self.assertEqual(
+            first_match.matched_alias,
+            "chest pain",
+        )
+        self.assertEqual(
+            (
+                first_match.normalized_start,
+                first_match.normalized_end,
+            ),
+            (0, 10),
+        )
+        self.assertEqual(
+            (
+                first_match.original_start,
+                first_match.original_end,
+            ),
+            (0, 10),
+        )
+        self.assertEqual(
+            first_match.original_text,
+            "Chest pain",
+        )
+
+        self.assertEqual(
+            second_match.original_text,
+            "chest pain",
+        )
+
+    def test_arabic_match_restores_diacritized_original_evidence(
+        self,
+    ) -> None:
+        arabic_evidence = (
+            "\u0623\u064e\u0644\u064e\u0645\u064c "
+            "\u0641\u064a "
+            "\u0627\u0644\u0635\u062f\u0631"
+        )
+
+        invalid_longer_word = (
+            ARABIC_CHEST_PAIN
+            + "\u064a"
+        )
+
+        text = (
+            "\u0644\u062f\u064a "
+            + arabic_evidence
+            + "\u060c "
+            + invalid_longer_word
+            + "."
+        )
+
+        result = match_medical_concepts(text)
+
+        self.assertEqual(len(result.matches), 1)
+
+        match = result.matches[0]
+
+        self.assertEqual(
+            match.concept_code,
+            "chest_pain",
+        )
+        self.assertEqual(
+            match.language,
+            ConceptLanguage.ARABIC,
+        )
+        self.assertEqual(
+            match.matched_alias,
+            ARABIC_CHEST_PAIN,
+        )
+        self.assertEqual(
+            match.original_text,
+            arabic_evidence,
+        )
+        self.assertEqual(
+            result.original_text[
+                match.original_start:match.original_end
+            ],
+            arabic_evidence,
+        )
+        self.assertEqual(
+            result.normalized_text[
+                match.normalized_start:match.normalized_end
+            ],
+            ARABIC_CHEST_PAIN,
+        )
+
+    def test_multiple_concepts_are_returned_in_text_order(self) -> None:
+        result = match_medical_concepts(
+            "Chest pain and shortness of breath."
+        )
+
+        self.assertEqual(
+            tuple(
+                match.concept_code
+                for match in result.matches
+            ),
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+        self.assertEqual(
+            result.concept_codes,
+            (
+                "chest_pain",
+                "shortness_of_breath",
+            ),
+        )
+
+    def test_longest_alias_wins_when_candidates_start_together(
+        self,
+    ) -> None:
+        short_concept = MedicalConcept(
+            code="chest",
+            aliases=(
+                ConceptAlias(
+                    text="chest",
+                    language=ConceptLanguage.ENGLISH,
+                ),
+            ),
+        )
+
+        long_concept = MedicalConcept(
+            code="chest_pain_phrase",
+            aliases=(
+                ConceptAlias(
+                    text="chest pain",
+                    language=ConceptLanguage.ENGLISH,
+                ),
+            ),
+        )
+
+        test_lexicon = ConceptLexiconRegistry(
+            concepts=(
+                short_concept,
+                long_concept,
+            ),
+        )
+
+        result = match_medical_concepts(
+            "Chest pain.",
+            lexicon=test_lexicon,
+        )
+
+        self.assertEqual(len(result.matches), 1)
+        self.assertEqual(
+            result.matches[0].concept_code,
+            "chest_pain_phrase",
+        )
+        self.assertEqual(
+            result.matches[0].matched_alias,
+            "chest pain",
+        )
+
+    def test_text_without_known_aliases_returns_empty_result(
+        self,
+    ) -> None:
+        result = match_medical_concepts(
+            "The sky is blue."
+        )
+
+        self.assertFalse(result.has_matches)
+        self.assertEqual(result.matches, ())
+        self.assertEqual(result.concept_codes, ())
