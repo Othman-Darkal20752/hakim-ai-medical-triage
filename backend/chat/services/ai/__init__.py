@@ -1,3 +1,4 @@
+from .config import AIProviderConfig, load_ai_provider_config
 from .exceptions import (
     AIConfigurationError,
     AIIntegrationDisabledError,
@@ -12,6 +13,8 @@ __all__ = [
     "AIMessage",
     "AIProvider",
     "AIProviderResult",
+    "AIProviderConfig",
+    "load_ai_provider_config",
     "AIServiceError",
     "AIIntegrationDisabledError",
     "AIConfigurationError",
