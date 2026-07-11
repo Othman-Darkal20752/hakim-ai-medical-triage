@@ -1,3 +1,5 @@
+from dataclasses import FrozenInstanceError
+
 from django.test import SimpleTestCase
 from chat.services.triage.red_flags.assertion import detect_assertions
 from chat.services.triage.red_flags.concepts import (
@@ -13,7 +15,15 @@ from chat.services.triage.red_flags.lexicon import (
 from chat.services.triage.red_flags.matching import match_medical_concepts
 from chat.services.triage.red_flags.normalization import normalize_text
 from chat.services.triage.red_flags.registry import ConceptLexiconRegistry
-from chat.services.triage.red_flags.schemas import AssertionStatus
+from chat.services.triage.red_flags.rules import (
+    RedFlagEvidenceRequirement,
+    RedFlagRule,
+    RedFlagRuleRegistry,
+)
+from chat.services.triage.red_flags.schemas import (
+    AssertionStatus,
+    RedFlagUrgency,
+)
 
 
 ARABIC_CHEST_PAIN = (
@@ -644,3 +654,253 @@ class AssertionDetectionTests(SimpleTestCase):
         self.assertEqual(result.present_matches, ())
         self.assertEqual(result.negated_matches, ())
         self.assertIs(result.source, concept_result)
+
+
+class RedFlagRuleSchemaAndRegistryTests(SimpleTestCase):
+    def _make_evidence(
+        self,
+        concept_code: str = "chest_pain",
+    ) -> RedFlagEvidenceRequirement:
+        return RedFlagEvidenceRequirement(
+            concept_code=concept_code,
+            accepted_assertion_statuses=(
+                AssertionStatus.PRESENT,
+            ),
+        )
+
+    def _make_rule(
+        self,
+        rule_id: str = "test_chest_pain_rule",
+        concept_code: str = "chest_pain",
+    ) -> RedFlagRule:
+        return RedFlagRule(
+            rule_id=rule_id,
+            version=1,
+            required_evidence=(
+                self._make_evidence(concept_code),
+            ),
+            urgency=RedFlagUrgency.EMERGENCY,
+            warning_key="red_flags.test_chest_pain",
+        )
+
+    def test_valid_registry_supports_deterministic_lookup(
+        self,
+    ) -> None:
+        first_rule = self._make_rule(
+            rule_id="first_test_rule",
+            concept_code="chest_pain",
+        )
+        second_rule = self._make_rule(
+            rule_id="second_test_rule",
+            concept_code="shortness_of_breath",
+        )
+
+        registry = RedFlagRuleRegistry(
+            rules=(first_rule, second_rule),
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+        self.assertEqual(
+            registry.rule_ids,
+            ("first_test_rule", "second_test_rule"),
+        )
+        self.assertEqual(
+            tuple(registry),
+            (first_rule, second_rule),
+        )
+        self.assertIs(
+            registry.get("first_test_rule"),
+            first_rule,
+        )
+        self.assertIs(
+            registry.require("second_test_rule"),
+            second_rule,
+        )
+        self.assertEqual(len(registry), 2)
+
+    def test_empty_registry_is_valid(self) -> None:
+        registry = RedFlagRuleRegistry(
+            rules=(),
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+        self.assertEqual(len(registry), 0)
+        self.assertEqual(registry.rule_ids, ())
+        self.assertEqual(tuple(registry), ())
+
+    def test_evidence_rejects_invalid_concept_code(self) -> None:
+        with self.assertRaises(ValueError):
+            RedFlagEvidenceRequirement(
+                concept_code="Chest Pain",
+                accepted_assertion_statuses=(
+                    AssertionStatus.PRESENT,
+                ),
+            )
+
+    def test_evidence_requires_assertion_status_tuple(
+        self,
+    ) -> None:
+        with self.assertRaises(TypeError):
+            RedFlagEvidenceRequirement(
+                concept_code="chest_pain",
+                accepted_assertion_statuses=[
+                    AssertionStatus.PRESENT,
+                ],
+            )
+
+    def test_evidence_rejects_empty_assertion_statuses(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError):
+            RedFlagEvidenceRequirement(
+                concept_code="chest_pain",
+                accepted_assertion_statuses=(),
+            )
+
+    def test_evidence_rejects_duplicate_assertion_statuses(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError):
+            RedFlagEvidenceRequirement(
+                concept_code="chest_pain",
+                accepted_assertion_statuses=(
+                    AssertionStatus.PRESENT,
+                    AssertionStatus.PRESENT,
+                ),
+            )
+
+    def test_evidence_rejects_non_assertion_status(
+        self,
+    ) -> None:
+        with self.assertRaises(TypeError):
+            RedFlagEvidenceRequirement(
+                concept_code="chest_pain",
+                accepted_assertion_statuses=("present",),
+            )
+
+    def test_rule_rejects_invalid_rule_id(self) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(ValueError):
+            RedFlagRule(
+                rule_id="Invalid Rule ID",
+                version=1,
+                required_evidence=(evidence,),
+                urgency=RedFlagUrgency.EMERGENCY,
+                warning_key="red_flags.invalid_rule",
+            )
+
+    def test_rule_rejects_boolean_version(self) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(TypeError):
+            RedFlagRule(
+                rule_id="test_rule",
+                version=True,
+                required_evidence=(evidence,),
+                urgency=RedFlagUrgency.EMERGENCY,
+                warning_key="red_flags.test_rule",
+            )
+
+    def test_rule_requires_evidence_tuple(self) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(TypeError):
+            RedFlagRule(
+                rule_id="test_rule",
+                version=1,
+                required_evidence=[evidence],
+                urgency=RedFlagUrgency.EMERGENCY,
+                warning_key="red_flags.test_rule",
+            )
+
+    def test_rule_rejects_duplicate_concept_codes(
+        self,
+    ) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(ValueError):
+            RedFlagRule(
+                rule_id="test_rule",
+                version=1,
+                required_evidence=(evidence, evidence),
+                urgency=RedFlagUrgency.EMERGENCY,
+                warning_key="red_flags.test_rule",
+            )
+
+    def test_rule_rejects_non_urgency_value(self) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(TypeError):
+            RedFlagRule(
+                rule_id="test_rule",
+                version=1,
+                required_evidence=(evidence,),
+                urgency="emergency",
+                warning_key="red_flags.test_rule",
+            )
+
+    def test_rule_rejects_invalid_warning_key(self) -> None:
+        evidence = self._make_evidence()
+
+        with self.assertRaises(ValueError):
+            RedFlagRule(
+                rule_id="test_rule",
+                version=1,
+                required_evidence=(evidence,),
+                urgency=RedFlagUrgency.EMERGENCY,
+                warning_key="red_flags",
+            )
+
+    def test_registry_rejects_duplicate_rule_ids(
+        self,
+    ) -> None:
+        rule = self._make_rule()
+
+        with self.assertRaises(ValueError):
+            RedFlagRuleRegistry(
+                rules=(rule, rule),
+                concept_registry=CONCEPT_LEXICON,
+            )
+
+    def test_registry_rejects_unknown_concept_code(
+        self,
+    ) -> None:
+        rule = self._make_rule(
+            concept_code="unknown_medical_concept",
+        )
+
+        with self.assertRaises(ValueError):
+            RedFlagRuleRegistry(
+                rules=(rule,),
+                concept_registry=CONCEPT_LEXICON,
+            )
+
+    def test_registry_require_rejects_unknown_rule_id(
+        self,
+    ) -> None:
+        registry = RedFlagRuleRegistry(
+            rules=(),
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+        self.assertIsNone(registry.get("unknown_rule"))
+
+        with self.assertRaises(KeyError):
+            registry.require("unknown_rule")
+
+    def test_rule_and_registry_are_immutable(self) -> None:
+        rule = self._make_rule()
+        registry = RedFlagRuleRegistry(
+            rules=(rule,),
+            concept_registry=CONCEPT_LEXICON,
+        )
+
+        with self.assertRaises(FrozenInstanceError):
+            rule.version = 2
+
+        with self.assertRaises(FrozenInstanceError):
+            registry.rules = ()
+
+        with self.assertRaises(TypeError):
+            registry._rules_by_id["another_rule"] = rule
