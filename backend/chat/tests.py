@@ -1,5 +1,5 @@
 from django.test import SimpleTestCase
-
+from chat.services.triage.red_flags.assertion import detect_assertions
 from chat.services.triage.red_flags.concepts import (
     ConceptAlias,
     ConceptLanguage,
@@ -13,6 +13,7 @@ from chat.services.triage.red_flags.lexicon import (
 from chat.services.triage.red_flags.matching import match_medical_concepts
 from chat.services.triage.red_flags.normalization import normalize_text
 from chat.services.triage.red_flags.registry import ConceptLexiconRegistry
+from chat.services.triage.red_flags.schemas import AssertionStatus
 
 
 ARABIC_CHEST_PAIN = (
@@ -481,3 +482,165 @@ class MedicalConceptMatchingTests(SimpleTestCase):
         self.assertFalse(result.has_matches)
         self.assertEqual(result.matches, ())
         self.assertEqual(result.concept_codes, ())
+
+class AssertionDetectionTests(SimpleTestCase):
+    def test_present_concept_preserves_original_match(self) -> None:
+        concept_result = match_medical_concepts(
+            "I have chest pain."
+        )
+
+        result = detect_assertions(concept_result)
+
+        self.assertTrue(result.has_matches)
+        self.assertIs(result.source, concept_result)
+        self.assertEqual(len(result.matches), 1)
+
+        asserted_match = result.matches[0]
+
+        self.assertIs(
+            asserted_match.match,
+            concept_result.matches[0],
+        )
+        self.assertEqual(
+            asserted_match.assertion,
+            AssertionStatus.PRESENT,
+        )
+        self.assertIsNone(asserted_match.matched_cue)
+
+    def test_formal_arabic_negation_is_detected(self) -> None:
+        result = detect_assertions(
+            match_medical_concepts(
+                f"لا اعاني من {ARABIC_CHEST_PAIN}"
+            )
+        )
+
+        self.assertEqual(len(result.matches), 1)
+        self.assertEqual(
+            result.matches[0].assertion,
+            AssertionStatus.NEGATED,
+        )
+        self.assertEqual(
+            result.matches[0].matched_cue,
+            "لا اعاني من",
+        )
+
+    def test_joined_colloquial_negation_and_positive_reset(
+        self,
+    ) -> None:
+        text = (
+            f"ماعندي {ARABIC_CHEST_PAIN} "
+            f"عندي {ARABIC_SHORTNESS_OF_BREATH}"
+        )
+
+        result = detect_assertions(
+            match_medical_concepts(text)
+        )
+
+        self.assertEqual(len(result.matches), 2)
+        self.assertEqual(
+            tuple(
+                item.assertion
+                for item in result.matches
+            ),
+            (
+                AssertionStatus.NEGATED,
+                AssertionStatus.PRESENT,
+            ),
+        )
+        self.assertEqual(
+            result.matches[0].matched_cue,
+            "ماعندي",
+        )
+        self.assertIsNone(
+            result.matches[1].matched_cue,
+        )
+
+    def test_without_negates_only_following_concept(
+        self,
+    ) -> None:
+        text = (
+            f"عندي {ARABIC_CHEST_PAIN} "
+            f"بدون {ARABIC_SHORTNESS_OF_BREATH}"
+        )
+
+        result = detect_assertions(
+            match_medical_concepts(text)
+        )
+
+        self.assertEqual(len(result.matches), 2)
+        self.assertEqual(
+            result.matches[0].assertion,
+            AssertionStatus.PRESENT,
+        )
+        self.assertEqual(
+            result.matches[1].assertion,
+            AssertionStatus.NEGATED,
+        )
+        self.assertEqual(
+            result.matches[1].matched_cue,
+            "بدون",
+        )
+
+    def test_punctuation_stops_negation_scope(self) -> None:
+        text = (
+            f"لا اعاني من {ARABIC_CHEST_PAIN}. "
+            f"{ARABIC_SHORTNESS_OF_BREATH}"
+        )
+
+        result = detect_assertions(
+            match_medical_concepts(text)
+        )
+
+        self.assertEqual(len(result.matches), 2)
+        self.assertEqual(
+            tuple(
+                item.assertion
+                for item in result.matches
+            ),
+            (
+                AssertionStatus.NEGATED,
+                AssertionStatus.PRESENT,
+            ),
+        )
+
+    def test_english_clause_boundary_resets_negation(
+        self,
+    ) -> None:
+        result = detect_assertions(
+            match_medical_concepts(
+                "I do not have chest pain "
+                "but I have shortness of breath."
+            )
+        )
+
+        self.assertEqual(len(result.matches), 2)
+        self.assertEqual(
+            tuple(
+                item.assertion
+                for item in result.matches
+            ),
+            (
+                AssertionStatus.NEGATED,
+                AssertionStatus.PRESENT,
+            ),
+        )
+        self.assertEqual(
+            result.matches[0].matched_cue,
+            "do not have",
+        )
+        self.assertIsNone(
+            result.matches[1].matched_cue,
+        )
+
+    def test_result_without_concepts_remains_empty(self) -> None:
+        concept_result = match_medical_concepts(
+            "The sky is blue."
+        )
+
+        result = detect_assertions(concept_result)
+
+        self.assertFalse(result.has_matches)
+        self.assertEqual(result.matches, ())
+        self.assertEqual(result.present_matches, ())
+        self.assertEqual(result.negated_matches, ())
+        self.assertIs(result.source, concept_result)
