@@ -1,6 +1,15 @@
+import json
+from collections.abc import Sequence
 from dataclasses import FrozenInstanceError
 
 from django.test import SimpleTestCase
+from chat.services.ai.exceptions import AIInvalidResponseError
+from chat.services.ai.provider import (
+    AIMessage,
+    AIProvider,
+    AIProviderResult,
+)
+from chat.services.ai.schemas import TriageResponse
 from chat.services.chat_orchestrator import (
     ChatExecutionPath,
     ChatOrchestrationResult,
@@ -2227,7 +2236,32 @@ class SafetyGateTests(SimpleTestCase):
                 rule_registry="invalid registry",
             )
 
+
+class _RecordingAIProvider(AIProvider):
+    def __init__(
+        self,
+        result: AIProviderResult,
+    ) -> None:
+        self.result = result
+        self.call_count = 0
+        self.received_messages: Sequence[AIMessage] | None = None
+
+    def generate_structured(
+        self,
+        *,
+        messages: Sequence[AIMessage],
+    ) -> AIProviderResult:
+        self.call_count += 1
+        self.received_messages = messages
+        return self.result
+
+
 class ChatOrchestratorTests(SimpleTestCase):
+    allowed_specialty_codes = (
+        "general_medicine",
+        "cardiology",
+    )
+
     def _make_urgent_decision(
         self,
     ) -> StructuredSafetyDecision:
@@ -2251,11 +2285,102 @@ class ChatOrchestratorTests(SimpleTestCase):
             ),
         )
 
-    def test_continue_routes_to_ai_provider(
+    def _make_messages(
+        self,
+        patient_text: str,
+    ) -> tuple[AIMessage, ...]:
+        return (
+            AIMessage(
+                role="system",
+                content="Test medical safety system prompt.",
+            ),
+            AIMessage(
+                role="user",
+                content=patient_text,
+            ),
+        )
+
+    def _make_provider_result(
+        self,
+        *,
+        urgency: str = "routine",
+        suggested_specialty_code: str | None = (
+            "general_medicine"
+        ),
+    ) -> AIProviderResult:
+        if urgency == "emergency":
+            follow_up_questions: list[str] = []
+            emergency_warning: str | None = (
+                "Seek immediate emergency medical care."
+            )
+        else:
+            follow_up_questions = [
+                "How long have you had these symptoms?"
+            ]
+            emergency_warning = None
+
+        payload = {
+            "symptom_summary": [
+                "The patient reported a test symptom."
+            ],
+            "follow_up_questions": follow_up_questions,
+            "urgency": urgency,
+            "suggested_specialty_code": (
+                suggested_specialty_code
+            ),
+            "needs_more_information": False,
+            "emergency_warning": emergency_warning,
+            "safety_disclaimer": (
+                "This is preliminary medical guidance and "
+                "not a final diagnosis."
+            ),
+        }
+
+        return AIProviderResult(
+            provider="test-provider",
+            model="test-model",
+            raw_json=json.dumps(payload),
+            request_id="test-request-id",
+        )
+
+    def _make_triage_response(
+        self,
+    ) -> TriageResponse:
+        return TriageResponse(
+            symptom_summary=(
+                "The patient reported a test symptom.",
+            ),
+            follow_up_questions=(
+                "How long have you had these symptoms?",
+            ),
+            urgency="routine",
+            suggested_specialty_code="general_medicine",
+            needs_more_information=False,
+            emergency_warning=None,
+            safety_disclaimer=(
+                "This is preliminary medical guidance and "
+                "not a final diagnosis."
+            ),
+        )
+
+    def test_continue_calls_provider_and_parses_response(
         self,
     ) -> None:
+        patient_text = "I have a mild headache."
+        messages = self._make_messages(patient_text)
+        provider = _RecordingAIProvider(
+            self._make_provider_result(
+                urgency="routine",
+            )
+        )
+
         result = orchestrate_chat(
-            "The weather is pleasant today."
+            patient_text,
+            ai_provider=provider,
+            ai_messages=messages,
+            allowed_specialty_codes=(
+                self.allowed_specialty_codes
+            ),
         )
 
         self.assertEqual(
@@ -2263,16 +2388,37 @@ class ChatOrchestratorTests(SimpleTestCase):
             ChatExecutionPath.AI_PROVIDER,
         )
         self.assertTrue(result.should_call_ai_provider)
+        self.assertEqual(provider.call_count, 1)
+        self.assertIs(provider.received_messages, messages)
+        self.assertIsInstance(
+            result.triage_response,
+            TriageResponse,
+        )
         self.assertEqual(
-            result.safety_decision.decision,
-            SafetyDecisionType.CONTINUE,
+            result.triage_response.urgency,
+            "routine",
+        )
+        self.assertEqual(
+            result.triage_response.suggested_specialty_code,
+            "general_medicine",
         )
 
-    def test_emergency_routes_to_backend_safety_response(
+    def test_emergency_does_not_call_ai_provider(
         self,
     ) -> None:
+        patient_text = "I have loss of consciousness."
+        messages = self._make_messages(patient_text)
+        provider = _RecordingAIProvider(
+            self._make_provider_result()
+        )
+
         result = orchestrate_chat(
-            "I have loss of consciousness."
+            patient_text,
+            ai_provider=provider,
+            ai_messages=messages,
+            allowed_specialty_codes=(
+                self.allowed_specialty_codes
+            ),
         )
 
         self.assertEqual(
@@ -2280,53 +2426,180 @@ class ChatOrchestratorTests(SimpleTestCase):
             ChatExecutionPath.BACKEND_SAFETY_RESPONSE,
         )
         self.assertFalse(result.should_call_ai_provider)
+        self.assertEqual(provider.call_count, 0)
+        self.assertIsNone(provider.received_messages)
+        self.assertIsNone(result.triage_response)
         self.assertEqual(
             result.safety_decision.decision,
             SafetyDecisionType.EMERGENCY,
         )
-        self.assertTrue(
-            result.safety_decision.should_short_circuit_llm
-        )
 
-    def test_injected_urgent_decision_preserves_urgency_floor(
+    def test_urgent_safety_decision_applies_urgency_floor(
         self,
     ) -> None:
-        patient_text = "I have an urgent symptom."
         expected_decision = self._make_urgent_decision()
-        received_patient_texts: list[str] = []
 
-        def fake_safety_evaluator(
-            received_patient_text: str,
-        ) -> StructuredSafetyDecision:
-            received_patient_texts.append(
-                received_patient_text
+        urgency_cases = {
+            "routine": "urgent",
+            "soon": "urgent",
+            "urgent": "urgent",
+            "emergency": "emergency",
+        }
+
+        for model_urgency, expected_urgency in (
+            urgency_cases.items()
+        ):
+            with self.subTest(
+                model_urgency=model_urgency,
+            ):
+                patient_text = "I have an urgent symptom."
+                messages = self._make_messages(patient_text)
+                provider = _RecordingAIProvider(
+                    self._make_provider_result(
+                        urgency=model_urgency,
+                    )
+                )
+
+                result = orchestrate_chat(
+                    patient_text,
+                    ai_provider=provider,
+                    ai_messages=messages,
+                    allowed_specialty_codes=(
+                        self.allowed_specialty_codes
+                    ),
+                    safety_evaluator=(
+                        lambda _: expected_decision
+                    ),
+                )
+
+                self.assertEqual(provider.call_count, 1)
+                self.assertIs(
+                    result.safety_decision,
+                    expected_decision,
+                )
+                self.assertEqual(
+                    result.execution_path,
+                    ChatExecutionPath.AI_PROVIDER,
+                )
+                self.assertEqual(
+                    result.triage_response.urgency,
+                    expected_urgency,
+                )
+
+    def test_continue_preserves_validated_model_urgency(
+        self,
+    ) -> None:
+        for model_urgency in (
+            "routine",
+            "soon",
+            "urgent",
+            "emergency",
+        ):
+            with self.subTest(
+                model_urgency=model_urgency,
+            ):
+                patient_text = "I have a test symptom."
+                messages = self._make_messages(patient_text)
+                provider = _RecordingAIProvider(
+                    self._make_provider_result(
+                        urgency=model_urgency,
+                    )
+                )
+
+                result = orchestrate_chat(
+                    patient_text,
+                    ai_provider=provider,
+                    ai_messages=messages,
+                    allowed_specialty_codes=(
+                        self.allowed_specialty_codes
+                    ),
+                )
+
+                self.assertEqual(
+                    result.safety_decision.decision,
+                    SafetyDecisionType.CONTINUE,
+                )
+                self.assertEqual(
+                    result.triage_response.urgency,
+                    model_urgency,
+                )
+
+    def test_invalid_provider_json_is_rejected(
+        self,
+    ) -> None:
+        provider = _RecordingAIProvider(
+            AIProviderResult(
+                provider="test-provider",
+                model="test-model",
+                raw_json="{invalid-json",
             )
-            return expected_decision
+        )
+
+        with self.assertRaises(AIInvalidResponseError):
+            orchestrate_chat(
+                "I have a mild headache.",
+                ai_provider=provider,
+                ai_messages=self._make_messages(
+                    "I have a mild headache."
+                ),
+                allowed_specialty_codes=(
+                    self.allowed_specialty_codes
+                ),
+            )
+
+        self.assertEqual(provider.call_count, 1)
+
+    def test_disallowed_specialty_code_is_rejected(
+        self,
+    ) -> None:
+        provider = _RecordingAIProvider(
+            self._make_provider_result(
+                suggested_specialty_code=(
+                    "unknown_specialty"
+                ),
+            )
+        )
+
+        with self.assertRaises(AIInvalidResponseError):
+            orchestrate_chat(
+                "I have a mild headache.",
+                ai_provider=provider,
+                ai_messages=self._make_messages(
+                    "I have a mild headache."
+                ),
+                allowed_specialty_codes=(
+                    self.allowed_specialty_codes
+                ),
+            )
+
+    def test_result_does_not_expose_raw_provider_json(
+        self,
+    ) -> None:
+        provider_result = self._make_provider_result()
+        provider = _RecordingAIProvider(provider_result)
 
         result = orchestrate_chat(
-            patient_text,
-            safety_evaluator=fake_safety_evaluator,
+            "I have a mild headache.",
+            ai_provider=provider,
+            ai_messages=self._make_messages(
+                "I have a mild headache."
+            ),
+            allowed_specialty_codes=(
+                self.allowed_specialty_codes
+            ),
         )
 
-        self.assertEqual(
-            received_patient_texts,
-            [patient_text],
+        self.assertFalse(hasattr(result, "raw_json"))
+        self.assertFalse(
+            hasattr(result, "ai_provider_result")
         )
-        self.assertIs(
-            result.safety_decision,
-            expected_decision,
+        self.assertNotIn(
+            "raw_json",
+            result.triage_response.to_dict(),
         )
-        self.assertEqual(
-            result.execution_path,
-            ChatExecutionPath.AI_PROVIDER,
-        )
-        self.assertTrue(result.should_call_ai_provider)
-        self.assertEqual(
-            result.safety_decision.highest_urgency,
-            RedFlagUrgency.URGENT,
-        )
-        self.assertTrue(
-            result.safety_decision.must_override_model
+        self.assertNotIn(
+            provider_result.raw_json,
+            repr(result),
         )
 
     def test_result_rejects_inconsistent_execution_path(
@@ -2345,6 +2618,49 @@ class ChatOrchestratorTests(SimpleTestCase):
                     ChatExecutionPath.AI_PROVIDER
                 ),
                 safety_decision=emergency_decision,
+                triage_response=(
+                    self._make_triage_response()
+                ),
+            )
+
+    def test_backend_path_rejects_triage_response(
+        self,
+    ) -> None:
+        emergency_decision = evaluate_chat_safety(
+            "I have loss of consciousness."
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "triage_response must be None",
+        ):
+            ChatOrchestrationResult(
+                execution_path=(
+                    ChatExecutionPath.BACKEND_SAFETY_RESPONSE
+                ),
+                safety_decision=emergency_decision,
+                triage_response=(
+                    self._make_triage_response()
+                ),
+            )
+
+    def test_ai_provider_path_requires_triage_response(
+        self,
+    ) -> None:
+        continue_decision = evaluate_chat_safety(
+            "The weather is pleasant today."
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "triage_response is required",
+        ):
+            ChatOrchestrationResult(
+                execution_path=(
+                    ChatExecutionPath.AI_PROVIDER
+                ),
+                safety_decision=continue_decision,
+                triage_response=None,
             )
 
     def test_result_rejects_invalid_execution_path_type(
@@ -2364,6 +2680,9 @@ class ChatOrchestratorTests(SimpleTestCase):
             ChatOrchestrationResult(
                 execution_path="ai_provider",
                 safety_decision=continue_decision,
+                triage_response=(
+                    self._make_triage_response()
+                ),
             )
 
     def test_result_rejects_invalid_safety_decision_type(
@@ -2381,16 +2700,50 @@ class ChatOrchestratorTests(SimpleTestCase):
                     ChatExecutionPath.AI_PROVIDER
                 ),
                 safety_decision="invalid decision",
+                triage_response=(
+                    self._make_triage_response()
+                ),
+            )
+
+    def test_result_rejects_invalid_triage_response_type(
+        self,
+    ) -> None:
+        continue_decision = evaluate_chat_safety(
+            "The weather is pleasant today."
+        )
+
+        with self.assertRaisesRegex(
+            TypeError,
+            (
+                "triage_response must be a "
+                "TriageResponse instance or None"
+            ),
+        ):
+            ChatOrchestrationResult(
+                execution_path=(
+                    ChatExecutionPath.AI_PROVIDER
+                ),
+                safety_decision=continue_decision,
+                triage_response="invalid response",
             )
 
     def test_result_is_immutable(
         self,
     ) -> None:
+        provider = _RecordingAIProvider(
+            self._make_provider_result()
+        )
+
         result = orchestrate_chat(
-            "The weather is pleasant today."
+            "I have a mild headache.",
+            ai_provider=provider,
+            ai_messages=self._make_messages(
+                "I have a mild headache."
+            ),
+            allowed_specialty_codes=(
+                self.allowed_specialty_codes
+            ),
         )
 
         with self.assertRaises(FrozenInstanceError):
-            result.execution_path = (
-                ChatExecutionPath.BACKEND_SAFETY_RESPONSE
-            )
+            result.triage_response = None
