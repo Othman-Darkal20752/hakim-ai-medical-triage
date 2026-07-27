@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -26,16 +26,14 @@ def build_hakim_reply(user_message: str) -> str:
 
 def get_or_create_chat_session(session_id, user):
     """
-    Session ownership rules:
-    - New session: attach to user if authenticated.
-    - Existing anonymous session: allow it, and attach it to user if authenticated.
-    - Existing user-owned session: only the same user can continue it.
+    Create or retrieve a chat session owned by the authenticated user.
+
+    Existing sessions can only be continued by their current owner.
+    Legacy anonymous sessions cannot be claimed by another account.
     """
 
     if not session_id:
-        return ChatSession.objects.create(
-            user=user if user.is_authenticated else None,
-        ), None
+        return ChatSession.objects.create(user=user), None
 
     try:
         session = ChatSession.objects.get(id=session_id)
@@ -45,29 +43,18 @@ def get_or_create_chat_session(session_id, user):
             status=400,
         )
 
-    if session.user is not None:
-        if not user.is_authenticated:
-            return None, JsonResponse(
-                {"error": "Authentication is required for this session"},
-                status=403,
-            )
-
-        if session.user_id != user.id:
-            return None, JsonResponse(
-                {"error": "You do not have permission to access this session"},
-                status=403,
-            )
-
-    if session.user is None and user.is_authenticated:
-        session.user = user
-        session.save(update_fields=["user", "updated_at"])
+    if session.user_id != user.id:
+        return None, JsonResponse(
+            {"error": "You do not have permission to access this session"},
+            status=403,
+        )
 
     return session, None
 
 
 @api_view(["POST"])
 @authentication_classes([JWTAuthentication])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def chat_messages(request):
     try:
         payload = json.loads(request.body.decode("utf-8"))
