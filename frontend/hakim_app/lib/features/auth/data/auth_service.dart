@@ -99,7 +99,7 @@ class AuthService {
         accessToken.isEmpty ||
         refreshToken == null ||
         refreshToken.isEmpty) {
-      await _tokenStorage.clear();
+      await invalidateLocalSession();
       return false;
     }
 
@@ -128,7 +128,7 @@ class AuthService {
       final newAccessToken = refreshData['access']?.toString();
 
       if (newAccessToken == null || newAccessToken.isEmpty) {
-        await _tokenStorage.clear();
+        await invalidateLocalSession();
         return false;
       }
 
@@ -151,7 +151,7 @@ class AuthService {
       return true;
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
-        await _tokenStorage.clear();
+        await invalidateLocalSession();
         return false;
       }
 
@@ -178,14 +178,22 @@ class AuthService {
     return _tokenStorage.isLoggedIn();
   }
 
-  Future<void> logout() async {
+  Future<void> invalidateLocalSession() async {
     final userId = await _tokenStorage.getUserId();
 
     if (userId != null && userId > 0) {
-      await _encryptedChatCache.deleteUserCache(userId: userId);
+      try {
+        await _encryptedChatCache.deleteUserCache(userId: userId);
+      } catch (_) {
+        // Authentication data must still be cleared if cache deletion fails.
+      }
     }
 
     await _tokenStorage.clear();
+  }
+
+  Future<void> logout() async {
+    await invalidateLocalSession();
 
     try {
       await _googleAuthService.signOut();
