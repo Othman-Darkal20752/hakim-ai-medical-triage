@@ -25,6 +25,12 @@ class TokenStorage {
 
   static Future<void>? _migrationFuture;
 
+  Future<void> saveAccessToken({required String accessToken}) async {
+    await _ensureLegacyDataMigrated();
+
+    await _secureStorage.write(key: _accessTokenKey, value: accessToken);
+  }
+
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
