@@ -170,6 +170,10 @@ class AuthService {
     return _tokenStorage.getUserId();
   }
 
+  Future<String?> getRole() {
+    return _tokenStorage.getRole();
+  }
+
   Future<bool> isLoggedIn() {
     return _tokenStorage.isLoggedIn();
   }

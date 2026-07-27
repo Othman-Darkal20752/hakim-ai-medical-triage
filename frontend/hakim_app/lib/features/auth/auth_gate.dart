@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../chat/chat_screen.dart';
 import '../onboarding/welcome_screen.dart';
+import 'authenticated_home.dart';
 import 'data/auth_service.dart';
 
 class AuthGate extends StatefulWidget {
@@ -64,7 +64,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (hasLocalSession) {
-      return const ChatScreen();
+      return const AuthenticatedHome();
     }
 
     return const WelcomeScreen();

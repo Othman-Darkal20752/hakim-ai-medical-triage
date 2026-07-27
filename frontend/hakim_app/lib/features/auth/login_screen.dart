@@ -3,7 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
-import '../chat/chat_screen.dart';
+import 'authenticated_home.dart';
 import 'data/auth_service.dart';
 import 'data/google_auth_service.dart';
 
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await _authService.login(username: username, password: password);
 
-      _openChat();
+      _openAuthenticatedHome();
     } on ApiException catch (e) {
       _setError(e.message);
     } catch (_) {
@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await _authService.loginWithGoogle();
 
-      _openChat();
+      _openAuthenticatedHome();
     } on GoogleAuthConfigurationException catch (e) {
       _setError(e.message);
     } on GoogleSignInException catch (e) {
@@ -114,12 +114,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _openChat() {
+  void _openAuthenticatedHome() {
     if (!mounted) return;
 
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const ChatScreen()));
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthenticatedHome()),
+      (route) => false,
+    );
   }
 
   @override
