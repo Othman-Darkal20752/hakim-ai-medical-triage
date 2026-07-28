@@ -107,19 +107,19 @@ abstract class AppLocalizations {
   /// No description provided for @appTagline.
   ///
   /// In en, this message translates to:
-  /// **'Your guide to the right doctor'**
+  /// **'Clear health guidance, from the first step.'**
   String get appTagline;
 
   /// No description provided for @welcomeDisclaimer.
   ///
   /// In en, this message translates to:
-  /// **'Hakim helps collect symptoms, detect emergency warning signs, and suggest the suitable medical specialty. It does not provide final diagnosis or prescribe treatment.'**
+  /// **'Hakim helps you understand urgency and reach the right specialty and doctor. It does not provide a final diagnosis or prescriptions.'**
   String get welcomeDisclaimer;
 
   /// No description provided for @getStarted.
   ///
   /// In en, this message translates to:
-  /// **'Get Started'**
+  /// **'Continue'**
   String get getStarted;
 
   /// No description provided for @chooseRole.
@@ -193,6 +193,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your message has been received. In the next step, Hakim will ask follow-up questions and check emergency warning signs before suggesting the suitable specialty.'**
   String get mockBotResponse;
+
+  /// No description provided for @welcomePrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'By continuing, you agree to the privacy policy and preliminary medical guidance.'**
+  String get welcomePrivacy;
 }
 
 class _AppLocalizationsDelegate

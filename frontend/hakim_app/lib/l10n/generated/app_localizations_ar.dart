@@ -12,14 +12,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get appName => 'حكيم';
 
   @override
-  String get appTagline => 'دليلك إلى الطبيب المناسب';
+  String get appTagline => 'توجيه صحي واضح، من أول خطوة.';
 
   @override
   String get welcomeDisclaimer =>
-      'يساعدك حكيم على جمع الأعراض، كشف علامات الخطر، واقتراح الاختصاص الطبي المناسب. التطبيق لا يقدم تشخيصاً نهائياً ولا يصف علاجاً أو أدوية.';
+      'يساعدك حكيم على فهم درجة الاستعجال والوصول إلى الاختصاص والطبيب المناسبين. لا يقدّم تشخيصًا نهائيًا أو وصفات علاجية.';
 
   @override
-  String get getStarted => 'ابدأ الآن';
+  String get getStarted => 'متابعة';
 
   @override
   String get chooseRole => 'اختيار الدور';
@@ -60,4 +60,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get mockBotResponse =>
       'تم استلام رسالتك. في الخطوة القادمة سيقوم حكيم بطرح أسئلة متابعة وفحص علامات الخطر قبل اقتراح الاختصاص المناسب.';
+
+  @override
+  String get welcomePrivacy =>
+      'بالمتابعة، أنت توافق على سياسة الخصوصية والإرشاد الطبي الأولي.';
 }

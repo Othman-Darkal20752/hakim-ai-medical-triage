@@ -61,8 +61,6 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: background,
-      fontFamily: 'Arial',
-
       textTheme: baseTextTheme.copyWith(
         headlineLarge: const TextStyle(
           fontSize: 28,

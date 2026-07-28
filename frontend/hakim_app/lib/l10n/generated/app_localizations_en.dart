@@ -12,14 +12,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appName => 'Hakim';
 
   @override
-  String get appTagline => 'Your guide to the right doctor';
+  String get appTagline => 'Clear health guidance, from the first step.';
 
   @override
   String get welcomeDisclaimer =>
-      'Hakim helps collect symptoms, detect emergency warning signs, and suggest the suitable medical specialty. It does not provide final diagnosis or prescribe treatment.';
+      'Hakim helps you understand urgency and reach the right specialty and doctor. It does not provide a final diagnosis or prescriptions.';
 
   @override
-  String get getStarted => 'Get Started';
+  String get getStarted => 'Continue';
 
   @override
   String get chooseRole => 'Choose Role';
@@ -60,4 +60,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mockBotResponse =>
       'Your message has been received. In the next step, Hakim will ask follow-up questions and check emergency warning signs before suggesting the suitable specialty.';
+
+  @override
+  String get welcomePrivacy =>
+      'By continuing, you agree to the privacy policy and preliminary medical guidance.';
 }
