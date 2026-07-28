@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../auth/data/auth_service.dart';
+import '../auth/data/session_expired_exception.dart';
 import '../onboarding/welcome_screen.dart';
 import 'data/chat_api.dart';
 import 'data/chat_message_dto.dart';
 import 'data/chat_reply_service.dart';
 
 class ChatScreen extends StatefulWidget {
+  final AuthService? authService;
   final String? initialSessionId;
   final List<ChatMessageDto> initialMessages;
   final bool isReadOnly;
 
   const ChatScreen({
     super.key,
+    this.authService,
     this.initialSessionId,
     this.initialMessages = const [],
     this.isReadOnly = false,
@@ -28,11 +30,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final AuthService _authService = AuthService();
-
-  final ChatReplyService _chatReplyService = ChatReplyService(
-    chatApi: ChatApi(ApiClient()),
-  );
+  late final AuthService _authService;
+  late final ChatReplyService _chatReplyService;
 
   final List<_ChatMessage> _messages = [];
 
@@ -44,6 +43,10 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
+    _authService = widget.authService ?? AuthService();
+    _chatReplyService = ChatReplyService(
+      chatApi: ChatApi(_authService.authenticatedApiClient),
+    );
     _sessionId = widget.initialSessionId;
 
     _messages.addAll(
@@ -106,12 +109,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final token = await _authService.getAccessToken();
-
       final result = await _chatReplyService.getReply(
         message: text,
         sessionId: _sessionId,
-        token: token,
       );
 
       if (!mounted) return;
@@ -128,6 +128,13 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         _isHakimTyping = false;
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        (route) => false,
+      );
     } catch (_) {
       if (!mounted) return;
 
@@ -242,7 +249,9 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: _isLoggingOut
                   ? null
                   : () {
-                      Navigator.of(context).pushNamed('/chat-sessions');
+                      Navigator.of(
+                        context,
+                      ).pushNamed('/chat-sessions', arguments: _authService);
                     },
               icon: const Icon(Icons.history_rounded),
             ),

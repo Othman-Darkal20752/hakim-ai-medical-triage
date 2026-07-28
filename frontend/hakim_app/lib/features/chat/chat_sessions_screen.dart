@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../auth/data/auth_service.dart';
+import '../auth/data/session_expired_exception.dart';
+import '../onboarding/welcome_screen.dart';
 import 'chat_screen.dart';
 import 'data/chat_history_api.dart';
 import 'data/chat_history_repository.dart';
@@ -15,7 +17,9 @@ import 'data/chat_session_summary.dart';
 enum _SessionAction { open, delete }
 
 class ChatSessionsScreen extends StatefulWidget {
-  const ChatSessionsScreen({super.key});
+  final AuthService authService;
+
+  const ChatSessionsScreen({super.key, required this.authService});
 
   @override
   State<ChatSessionsScreen> createState() => _ChatSessionsScreenState();
@@ -23,12 +27,11 @@ class ChatSessionsScreen extends StatefulWidget {
 
 class _ChatSessionsScreenState extends State<ChatSessionsScreen>
     with WidgetsBindingObserver {
-  final AuthService _authService = AuthService();
-  final ChatHistoryApi _chatHistoryApi = ChatHistoryApi(ApiClient());
-  final Connectivity _connectivity = Connectivity();
+  late final AuthService _authService;
+  late final ChatHistoryApi _chatHistoryApi;
+  late final ChatHistoryRepository _chatHistoryRepository;
 
-  late final ChatHistoryRepository _chatHistoryRepository =
-      ChatHistoryRepository(_chatHistoryApi);
+  final Connectivity _connectivity = Connectivity();
 
   ChatHistorySnapshot _history = const ChatHistorySnapshot.empty();
 
@@ -53,6 +56,10 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
   @override
   void initState() {
     super.initState();
+
+    _authService = widget.authService;
+    _chatHistoryApi = ChatHistoryApi(_authService.authenticatedApiClient);
+    _chatHistoryRepository = ChatHistoryRepository(_chatHistoryApi);
 
     WidgetsBinding.instance.addObserver(this);
 
@@ -121,19 +128,6 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
     );
   }
 
-  Future<String> _requireAccessToken() async {
-    final token = await _authService.getAccessToken();
-
-    if (token == null || token.isEmpty) {
-      throw const ApiException(
-        'جلسة تسجيل الدخول غير موجودة.',
-        statusCode: 401,
-      );
-    }
-
-    return token;
-  }
-
   Future<int> _requireUserId() async {
     final userId = await _authService.getUserId();
 
@@ -145,6 +139,15 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
     }
 
     return userId;
+  }
+
+  void _redirectToWelcome() {
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (route) => false,
+    );
   }
 
   Future<void> _loadSessions({bool showLoadingIndicator = true}) async {
@@ -160,13 +163,9 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
     }
 
     try {
-      final token = await _requireAccessToken();
       final userId = await _requireUserId();
 
-      final result = await _chatHistoryRepository.loadHistory(
-        token: token,
-        userId: userId,
-      );
+      final result = await _chatHistoryRepository.loadHistory(userId: userId);
 
       if (!mounted) return;
 
@@ -178,6 +177,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
       });
 
       _syncAutoRetryTimer();
+    } on SessionExpiredException {
+      _redirectToWelcome();
     } catch (_) {
       if (!mounted) return;
 
@@ -218,6 +219,7 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChatScreen(
+            authService: _authService,
             initialSessionId: detail.id,
             initialMessages: detail.messages,
             isReadOnly: _isOffline,
@@ -301,10 +303,9 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
     });
 
     try {
-      final token = await _requireAccessToken();
       final userId = await _requireUserId();
 
-      await _chatHistoryApi.deleteSession(sessionId: session.id, token: token);
+      await _chatHistoryApi.deleteSession(sessionId: session.id);
 
       await _chatHistoryRepository.removeSessionFromCache(
         userId: userId,
@@ -332,6 +333,8 @@ class _ChatSessionsScreenState extends State<ChatSessionsScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('تم حذف المحادثة بنجاح.')));
+    } on SessionExpiredException {
+      _redirectToWelcome();
     } on ApiException catch (error) {
       if (!mounted) return;
 

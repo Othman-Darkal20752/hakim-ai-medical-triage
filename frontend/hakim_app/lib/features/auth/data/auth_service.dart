@@ -1,6 +1,9 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/authenticated_api_client.dart';
 import 'auth_api.dart';
 import 'google_auth_service.dart';
+import 'session_refresh_coordinator.dart';
+import 'session_token_manager.dart';
 import 'token_storage.dart';
 import '../../chat/data/encrypted_chat_cache.dart';
 
@@ -10,15 +13,37 @@ class AuthService {
   final GoogleAuthService _googleAuthService;
   final EncryptedChatCache _encryptedChatCache;
 
+  late final SessionTokenManager _sessionTokenManager;
+  late final SessionRefreshCoordinator _sessionRefreshCoordinator;
+  late final AuthenticatedApiClient _authenticatedApiClient;
+
   AuthService({
     AuthApi? authApi,
     TokenStorage? tokenStorage,
     GoogleAuthService? googleAuthService,
     EncryptedChatCache? encryptedChatCache,
+    ApiClient? protectedApiClient,
   }) : _authApi = authApi ?? AuthApi(ApiClient()),
        _tokenStorage = tokenStorage ?? TokenStorage(),
        _googleAuthService = googleAuthService ?? GoogleAuthService(),
-       _encryptedChatCache = encryptedChatCache ?? EncryptedChatCache();
+       _encryptedChatCache = encryptedChatCache ?? EncryptedChatCache() {
+    _sessionTokenManager = SessionTokenManager(
+      tokenStorage: _tokenStorage,
+      invalidateLocalSession: invalidateLocalSession,
+    );
+
+    _sessionRefreshCoordinator = SessionRefreshCoordinator(
+      tokenManager: _sessionTokenManager,
+      authApi: _authApi,
+    );
+
+    _authenticatedApiClient = AuthenticatedApiClient(
+      apiClient: protectedApiClient ?? ApiClient(),
+      readAccessToken: _sessionTokenManager.readAccessToken,
+      refreshAccessToken: _sessionRefreshCoordinator.refreshAccessToken,
+      expireSession: _sessionTokenManager.expireSession,
+    );
+  }
 
   Future<void> login({
     required String username,
@@ -160,6 +185,10 @@ class AuthService {
     } catch (_) {
       return true;
     }
+  }
+
+  AuthenticatedApiClient get authenticatedApiClient {
+    return _authenticatedApiClient;
   }
 
   Future<String?> getAccessToken() {

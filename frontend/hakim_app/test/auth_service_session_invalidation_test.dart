@@ -16,10 +16,7 @@ class _FakeTokenStorage extends TokenStorage {
   bool cleared = false;
   bool throwOnClear = false;
 
-  _FakeTokenStorage({
-    required this.operations,
-    this.userId,
-  });
+  _FakeTokenStorage({required this.operations, this.userId});
 
   @override
   Future<int?> getUserId() async {
@@ -90,45 +87,38 @@ void main() {
     );
   }
 
-  test('invalidating session deletes cache before clearing auth data', () async {
-    final operations = <String>[];
-    final tokenStorage = _FakeTokenStorage(
-      operations: operations,
-      userId: 42,
-    );
-    final cache = _FakeEncryptedChatCache(operations: operations);
-    final googleAuthService = _FakeGoogleAuthService(
-      operations: operations,
-    );
+  test(
+    'invalidating session deletes cache before clearing auth data',
+    () async {
+      final operations = <String>[];
+      final tokenStorage = _FakeTokenStorage(
+        operations: operations,
+        userId: 42,
+      );
+      final cache = _FakeEncryptedChatCache(operations: operations);
+      final googleAuthService = _FakeGoogleAuthService(operations: operations);
 
-    final service = buildService(
-      tokenStorage: tokenStorage,
-      cache: cache,
-      googleAuthService: googleAuthService,
-    );
+      final service = buildService(
+        tokenStorage: tokenStorage,
+        cache: cache,
+        googleAuthService: googleAuthService,
+      );
 
-    await service.invalidateLocalSession();
+      await service.invalidateLocalSession();
 
-    expect(cache.deleted, isTrue);
-    expect(cache.deletedUserId, 42);
-    expect(tokenStorage.cleared, isTrue);
-    expect(
-      operations,
-      ['read-user-id', 'delete-cache', 'clear-auth'],
-    );
-  });
+      expect(cache.deleted, isTrue);
+      expect(cache.deletedUserId, 42);
+      expect(tokenStorage.cleared, isTrue);
+      expect(operations, ['read-user-id', 'delete-cache', 'clear-auth']);
+    },
+  );
 
   test('cache deletion failure does not prevent auth clearing', () async {
     final operations = <String>[];
-    final tokenStorage = _FakeTokenStorage(
-      operations: operations,
-      userId: 42,
-    );
+    final tokenStorage = _FakeTokenStorage(operations: operations, userId: 42);
     final cache = _FakeEncryptedChatCache(operations: operations)
       ..throwOnDelete = true;
-    final googleAuthService = _FakeGoogleAuthService(
-      operations: operations,
-    );
+    final googleAuthService = _FakeGoogleAuthService(operations: operations);
 
     final service = buildService(
       tokenStorage: tokenStorage,
@@ -140,10 +130,7 @@ void main() {
 
     expect(cache.deleted, isTrue);
     expect(tokenStorage.cleared, isTrue);
-    expect(
-      operations,
-      ['read-user-id', 'delete-cache', 'clear-auth'],
-    );
+    expect(operations, ['read-user-id', 'delete-cache', 'clear-auth']);
   });
 
   test('session without user id still clears authentication data', () async {
@@ -153,9 +140,7 @@ void main() {
       userId: null,
     );
     final cache = _FakeEncryptedChatCache(operations: operations);
-    final googleAuthService = _FakeGoogleAuthService(
-      operations: operations,
-    );
+    final googleAuthService = _FakeGoogleAuthService(operations: operations);
 
     final service = buildService(
       tokenStorage: tokenStorage,
@@ -172,14 +157,10 @@ void main() {
 
   test('Google sign-out failure does not block local logout', () async {
     final operations = <String>[];
-    final tokenStorage = _FakeTokenStorage(
-      operations: operations,
-      userId: 42,
-    );
+    final tokenStorage = _FakeTokenStorage(operations: operations, userId: 42);
     final cache = _FakeEncryptedChatCache(operations: operations);
-    final googleAuthService = _FakeGoogleAuthService(
-      operations: operations,
-    )..throwOnSignOut = true;
+    final googleAuthService = _FakeGoogleAuthService(operations: operations)
+      ..throwOnSignOut = true;
 
     final service = buildService(
       tokenStorage: tokenStorage,
@@ -192,14 +173,30 @@ void main() {
     expect(tokenStorage.cleared, isTrue);
     expect(cache.deleted, isTrue);
     expect(googleAuthService.signedOut, isTrue);
-    expect(
-      operations,
-      [
-        'read-user-id',
-        'delete-cache',
-        'clear-auth',
-        'google-sign-out',
-      ],
+    expect(operations, [
+      'read-user-id',
+      'delete-cache',
+      'clear-auth',
+      'google-sign-out',
+    ]);
+  });
+
+  test('reuses one authenticated API client for the service lifetime', () {
+    final operations = <String>[];
+    final tokenStorage = _FakeTokenStorage(operations: operations, userId: 42);
+    final cache = _FakeEncryptedChatCache(operations: operations);
+    final googleAuthService = _FakeGoogleAuthService(operations: operations);
+
+    final service = buildService(
+      tokenStorage: tokenStorage,
+      cache: cache,
+      googleAuthService: googleAuthService,
     );
+
+    final firstClient = service.authenticatedApiClient;
+    final secondClient = service.authenticatedApiClient;
+
+    expect(identical(firstClient, secondClient), isTrue);
+    expect(operations, isEmpty);
   });
 }

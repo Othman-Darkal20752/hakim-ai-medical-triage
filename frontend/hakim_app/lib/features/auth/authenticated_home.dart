@@ -52,7 +52,8 @@ class _AuthenticatedHomeState extends State<AuthenticatedHome> {
 
         return switch (role) {
           'patient' =>
-            widget.patientBuilder?.call(context) ?? const ChatScreen(),
+            widget.patientBuilder?.call(context) ??
+                ChatScreen(authService: _authService),
           'doctor' =>
             widget.doctorBuilder?.call(context) ??
                 DoctorHomeScreen(authService: _authService),

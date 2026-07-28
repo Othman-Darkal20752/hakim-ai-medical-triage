@@ -1,21 +1,21 @@
-import '../../../core/network/api_client.dart';
+import '../../../core/network/authenticated_api_client.dart';
 import 'chat_history_snapshot.dart';
 import 'chat_session_detail.dart';
 import 'chat_session_summary.dart';
 
 class ChatHistoryApi {
-  final ApiClient _apiClient;
+  final AuthenticatedApiClient _apiClient;
 
   ChatHistoryApi(this._apiClient);
 
-  Future<ChatHistorySnapshot> getHistory({required String token}) async {
-    final response = await _apiClient.get('/chat/history/', token: token);
+  Future<ChatHistorySnapshot> getHistory() async {
+    final response = await _apiClient.get('/chat/history/');
 
     return ChatHistorySnapshot.fromJson(response);
   }
 
-  Future<List<ChatSessionSummary>> getSessions({required String token}) async {
-    final response = await _apiClient.get('/chat/sessions/', token: token);
+  Future<List<ChatSessionSummary>> getSessions() async {
+    final response = await _apiClient.get('/chat/sessions/');
 
     final sessionsJson = response['sessions'] as List? ?? const [];
 
@@ -30,20 +30,13 @@ class ChatHistoryApi {
 
   Future<ChatSessionDetail> getSessionDetail({
     required String sessionId,
-    required String token,
   }) async {
-    final response = await _apiClient.get(
-      '/chat/sessions/$sessionId/',
-      token: token,
-    );
+    final response = await _apiClient.get('/chat/sessions/$sessionId/');
 
     return ChatSessionDetail.fromJson(response);
   }
 
-  Future<void> deleteSession({
-    required String sessionId,
-    required String token,
-  }) async {
-    await _apiClient.delete('/chat/sessions/$sessionId/', token: token);
+  Future<void> deleteSession({required String sessionId}) async {
+    await _apiClient.delete('/chat/sessions/$sessionId/');
   }
 }

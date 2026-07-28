@@ -1,8 +1,9 @@
 import '../../../core/network/api_client.dart';
+import '../../auth/data/session_expired_exception.dart';
 import 'chat_history_api.dart';
 import 'chat_history_snapshot.dart';
-import 'encrypted_chat_cache.dart';
 import 'chat_session_detail.dart';
+import 'encrypted_chat_cache.dart';
 
 class ChatHistoryLoadResult {
   final ChatHistorySnapshot history;
@@ -32,14 +33,11 @@ class ChatHistoryRepository {
   ChatHistoryRepository(this._historyApi, {EncryptedChatCache? encryptedCache})
     : _encryptedCache = encryptedCache ?? EncryptedChatCache();
 
-  Future<ChatHistoryLoadResult> loadHistory({
-    required String token,
-    required int userId,
-  }) async {
+  Future<ChatHistoryLoadResult> loadHistory({required int userId}) async {
     ChatHistorySnapshot onlineHistory;
 
     try {
-      onlineHistory = await _historyApi.getHistory(token: token);
+      onlineHistory = await _historyApi.getHistory();
     } catch (error, stackTrace) {
       if (!_canUseOfflineCache(error)) {
         Error.throwWithStackTrace(error, stackTrace);
@@ -122,6 +120,10 @@ class ChatHistoryRepository {
   }
 
   bool _canUseOfflineCache(Object error) {
+    if (error is SessionExpiredException) {
+      return false;
+    }
+
     if (error is ApiException) {
       final statusCode = error.statusCode;
 

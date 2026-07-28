@@ -4,9 +4,7 @@ import 'chat_reply_result.dart';
 class ChatReplyService {
   final ChatApi? chatApi;
 
-  const ChatReplyService({
-    this.chatApi,
-  });
+  const ChatReplyService({this.chatApi});
 
   static const bool useApi = bool.fromEnvironment(
     'USE_API',
@@ -16,14 +14,9 @@ class ChatReplyService {
   Future<ChatReplyResult> getReply({
     required String message,
     String? sessionId,
-    String? token,
   }) async {
     if (useApi && chatApi != null) {
-      return chatApi!.sendMessage(
-        message: message,
-        sessionId: sessionId,
-        token: token,
-      );
+      return chatApi!.sendMessage(message: message, sessionId: sessionId);
     }
 
     await Future.delayed(const Duration(milliseconds: 700));

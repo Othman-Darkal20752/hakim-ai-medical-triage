@@ -64,7 +64,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (hasLocalSession) {
-      return const AuthenticatedHome();
+      return AuthenticatedHome(authService: _authService);
     }
 
     return const WelcomeScreen();
