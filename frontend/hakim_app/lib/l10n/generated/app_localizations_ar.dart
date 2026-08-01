@@ -64,4 +64,63 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get welcomePrivacy =>
       'بالمتابعة، أنت توافق على سياسة الخصوصية والإرشاد الطبي الأولي.';
+
+  @override
+  String get patientLoginTitle => 'تسجيل دخول المريض';
+
+  @override
+  String get doctorLoginTitle => 'تسجيل دخول الطبيب';
+
+  @override
+  String get patientLoginWelcome => 'مرحباً بك في حكيم';
+
+  @override
+  String get doctorLoginWelcome => 'مرحباً بك في بوابة الطبيب';
+
+  @override
+  String get loginDescription =>
+      'سجّل الدخول للوصول إلى حسابك واستعادة جلستك بأمان.';
+
+  @override
+  String get usernameLabel => 'اسم المستخدم';
+
+  @override
+  String get passwordLabel => 'كلمة المرور';
+
+  @override
+  String get loginButton => 'تسجيل الدخول';
+
+  @override
+  String get orLabel => 'أو';
+
+  @override
+  String get continueWithGoogle => 'المتابعة باستخدام Google';
+
+  @override
+  String get loginRequiredFields => 'أدخل اسم المستخدم وكلمة المرور.';
+
+  @override
+  String get loginServerError =>
+      'تعذر تسجيل الدخول. تأكد من تشغيل الخادم والاتصال بالشبكة.';
+
+  @override
+  String get googleLoginCanceled => 'تم إلغاء تسجيل الدخول باستخدام Google.';
+
+  @override
+  String get googleClientConfigurationError =>
+      'إعداد Google غير صحيح. تحقق من package name وSHA-1 وWeb Client ID.';
+
+  @override
+  String get googleProviderConfigurationError =>
+      'خدمة Google Sign-In غير متاحة أو غير مضبوطة على الجهاز.';
+
+  @override
+  String get googleUiUnavailable => 'تعذر عرض نافذة اختيار حساب Google.';
+
+  @override
+  String get googleLoginFailed => 'فشل تسجيل الدخول باستخدام Google.';
+
+  @override
+  String get googleLoginServerError =>
+      'تعذر تسجيل الدخول باستخدام Google. تحقق من الاتصال وإعدادات الخادم.';
 }

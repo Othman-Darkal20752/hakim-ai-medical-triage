@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/localization/locale_controller.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../auth/auth_role.dart';
 import '../auth/login_screen.dart';
-
-enum _WelcomeRole { patient, doctor }
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -15,9 +14,9 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  _WelcomeRole? _selectedRole;
+  AuthRole? _selectedRole;
 
-  void _selectRole(_WelcomeRole role) {
+  void _selectRole(AuthRole role) {
     if (_selectedRole == role) {
       return;
     }
@@ -27,19 +26,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
   }
 
-  void _continue(AppLocalizations l10n) {
-    if (_selectedRole == _WelcomeRole.patient) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
+  void _continue() {
+    final selectedRole = _selectedRole;
+
+    if (selectedRole == null) {
       return;
     }
 
-    if (_selectedRole == _WelcomeRole.doctor) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.doctorFlowLater)));
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LoginScreen(role: selectedRole)),
+    );
   }
 
   @override
@@ -141,9 +137,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             child: _RoleCard(
                               icon: Icons.person_rounded,
                               label: l10n.patient,
-                              selected: _selectedRole == _WelcomeRole.patient,
+                              selected: _selectedRole == AuthRole.patient,
                               onPressed: () {
-                                _selectRole(_WelcomeRole.patient);
+                                _selectRole(AuthRole.patient);
                               },
                             ),
                           ),
@@ -152,9 +148,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             child: _RoleCard(
                               icon: Icons.medical_services_rounded,
                               label: l10n.doctor,
-                              selected: _selectedRole == _WelcomeRole.doctor,
+                              selected: _selectedRole == AuthRole.doctor,
                               onPressed: () {
-                                _selectRole(_WelcomeRole.doctor);
+                                _selectRole(AuthRole.doctor);
                               },
                             ),
                           ),
@@ -167,7 +163,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         onPressed: _selectedRole == null
                             ? null
                             : () {
-                                _continue(l10n);
+                                _continue();
                               },
                         style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(54),

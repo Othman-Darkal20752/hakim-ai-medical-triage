@@ -64,4 +64,64 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get welcomePrivacy =>
       'By continuing, you agree to the privacy policy and preliminary medical guidance.';
+
+  @override
+  String get patientLoginTitle => 'Patient Sign In';
+
+  @override
+  String get doctorLoginTitle => 'Doctor Sign In';
+
+  @override
+  String get patientLoginWelcome => 'Welcome to Hakim';
+
+  @override
+  String get doctorLoginWelcome => 'Welcome to the Doctor Portal';
+
+  @override
+  String get loginDescription =>
+      'Sign in to access your account and securely restore your session.';
+
+  @override
+  String get usernameLabel => 'Username';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get loginButton => 'Sign In';
+
+  @override
+  String get orLabel => 'OR';
+
+  @override
+  String get continueWithGoogle => 'Continue with Google';
+
+  @override
+  String get loginRequiredFields => 'Enter your username and password.';
+
+  @override
+  String get loginServerError =>
+      'Unable to sign in. Check that the server is running and that you are connected to the network.';
+
+  @override
+  String get googleLoginCanceled => 'Google sign-in was canceled.';
+
+  @override
+  String get googleClientConfigurationError =>
+      'Google configuration is invalid. Check the package name, SHA-1, and Web Client ID.';
+
+  @override
+  String get googleProviderConfigurationError =>
+      'Google Sign-In is unavailable or not configured on this device.';
+
+  @override
+  String get googleUiUnavailable =>
+      'Unable to display the Google account selection window.';
+
+  @override
+  String get googleLoginFailed => 'Google sign-in failed.';
+
+  @override
+  String get googleLoginServerError =>
+      'Unable to sign in with Google. Check the connection and server configuration.';
 }

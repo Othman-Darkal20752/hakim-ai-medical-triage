@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "ar",
   "appName": "حكيم",
   "appTagline": "توجيه صحي واضح، من أول خطوة.",
@@ -16,5 +16,23 @@
   "chatAskSymptoms": "يرجى وصف الأعراض التي تشعر بها بوضوح.",
   "symptomInputHint": "اكتب الأعراض التي تشعر بها...",
   "mockBotResponse": "تم استلام رسالتك. في الخطوة القادمة سيقوم حكيم بطرح أسئلة متابعة وفحص علامات الخطر قبل اقتراح الاختصاص المناسب.",
-  "welcomePrivacy": "بالمتابعة، أنت توافق على سياسة الخصوصية والإرشاد الطبي الأولي."
+  "welcomePrivacy": "بالمتابعة، أنت توافق على سياسة الخصوصية والإرشاد الطبي الأولي.",
+  "patientLoginTitle": "تسجيل دخول المريض",
+  "doctorLoginTitle": "تسجيل دخول الطبيب",
+  "patientLoginWelcome": "مرحباً بك في حكيم",
+  "doctorLoginWelcome": "مرحباً بك في بوابة الطبيب",
+  "loginDescription": "سجّل الدخول للوصول إلى حسابك واستعادة جلستك بأمان.",
+  "usernameLabel": "اسم المستخدم",
+  "passwordLabel": "كلمة المرور",
+  "loginButton": "تسجيل الدخول",
+  "orLabel": "أو",
+  "continueWithGoogle": "المتابعة باستخدام Google",
+  "loginRequiredFields": "أدخل اسم المستخدم وكلمة المرور.",
+  "loginServerError": "تعذر تسجيل الدخول. تأكد من تشغيل الخادم والاتصال بالشبكة.",
+  "googleLoginCanceled": "تم إلغاء تسجيل الدخول باستخدام Google.",
+  "googleClientConfigurationError": "إعداد Google غير صحيح. تحقق من package name وSHA-1 وWeb Client ID.",
+  "googleProviderConfigurationError": "خدمة Google Sign-In غير متاحة أو غير مضبوطة على الجهاز.",
+  "googleUiUnavailable": "تعذر عرض نافذة اختيار حساب Google.",
+  "googleLoginFailed": "فشل تسجيل الدخول باستخدام Google.",
+  "googleLoginServerError": "تعذر تسجيل الدخول باستخدام Google. تحقق من الاتصال وإعدادات الخادم."
 }

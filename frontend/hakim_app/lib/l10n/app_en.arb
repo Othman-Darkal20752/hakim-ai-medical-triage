@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
   "appName": "Hakim",
   "appTagline": "Clear health guidance, from the first step.",
@@ -16,5 +16,23 @@
   "chatAskSymptoms": "Please describe your symptoms clearly.",
   "symptomInputHint": "Describe your symptoms...",
   "mockBotResponse": "Your message has been received. In the next step, Hakim will ask follow-up questions and check emergency warning signs before suggesting the suitable specialty.",
-  "welcomePrivacy": "By continuing, you agree to the privacy policy and preliminary medical guidance."
+  "welcomePrivacy": "By continuing, you agree to the privacy policy and preliminary medical guidance.",
+  "patientLoginTitle": "Patient Sign In",
+  "doctorLoginTitle": "Doctor Sign In",
+  "patientLoginWelcome": "Welcome to Hakim",
+  "doctorLoginWelcome": "Welcome to the Doctor Portal",
+  "loginDescription": "Sign in to access your account and securely restore your session.",
+  "usernameLabel": "Username",
+  "passwordLabel": "Password",
+  "loginButton": "Sign In",
+  "orLabel": "OR",
+  "continueWithGoogle": "Continue with Google",
+  "loginRequiredFields": "Enter your username and password.",
+  "loginServerError": "Unable to sign in. Check that the server is running and that you are connected to the network.",
+  "googleLoginCanceled": "Google sign-in was canceled.",
+  "googleClientConfigurationError": "Google configuration is invalid. Check the package name, SHA-1, and Web Client ID.",
+  "googleProviderConfigurationError": "Google Sign-In is unavailable or not configured on this device.",
+  "googleUiUnavailable": "Unable to display the Google account selection window.",
+  "googleLoginFailed": "Google sign-in failed.",
+  "googleLoginServerError": "Unable to sign in with Google. Check the connection and server configuration."
 }

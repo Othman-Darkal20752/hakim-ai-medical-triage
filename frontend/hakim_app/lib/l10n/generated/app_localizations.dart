@@ -199,6 +199,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'By continuing, you agree to the privacy policy and preliminary medical guidance.'**
   String get welcomePrivacy;
+
+  /// No description provided for @patientLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Patient Sign In'**
+  String get patientLoginTitle;
+
+  /// No description provided for @doctorLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor Sign In'**
+  String get doctorLoginTitle;
+
+  /// No description provided for @patientLoginWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Hakim'**
+  String get patientLoginWelcome;
+
+  /// No description provided for @doctorLoginWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to the Doctor Portal'**
+  String get doctorLoginWelcome;
+
+  /// No description provided for @loginDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to access your account and securely restore your session.'**
+  String get loginDescription;
+
+  /// No description provided for @usernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get usernameLabel;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// No description provided for @loginButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get loginButton;
+
+  /// No description provided for @orLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get orLabel;
+
+  /// No description provided for @continueWithGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get continueWithGoogle;
+
+  /// No description provided for @loginRequiredFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your username and password.'**
+  String get loginRequiredFields;
+
+  /// No description provided for @loginServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to sign in. Check that the server is running and that you are connected to the network.'**
+  String get loginServerError;
+
+  /// No description provided for @googleLoginCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in was canceled.'**
+  String get googleLoginCanceled;
+
+  /// No description provided for @googleClientConfigurationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Google configuration is invalid. Check the package name, SHA-1, and Web Client ID.'**
+  String get googleClientConfigurationError;
+
+  /// No description provided for @googleProviderConfigurationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Sign-In is unavailable or not configured on this device.'**
+  String get googleProviderConfigurationError;
+
+  /// No description provided for @googleUiUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to display the Google account selection window.'**
+  String get googleUiUnavailable;
+
+  /// No description provided for @googleLoginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign-in failed.'**
+  String get googleLoginFailed;
+
+  /// No description provided for @googleLoginServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to sign in with Google. Check the connection and server configuration.'**
+  String get googleLoginServerError;
 }
 
 class _AppLocalizationsDelegate
