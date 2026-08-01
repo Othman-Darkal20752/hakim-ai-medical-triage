@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'accounts',
     'chat',
+    'doctors.apps.DoctorsConfig',
 ]
 
 MIDDLEWARE = [
