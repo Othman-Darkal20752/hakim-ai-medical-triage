@@ -45,6 +45,27 @@ class AuthService {
     );
   }
 
+  Future<void> register({
+    required String username,
+    String? email,
+    required String password,
+    required String passwordConfirm,
+    required String role,
+  }) async {
+    final registrationData = await _authApi.register(
+      username: username,
+      email: email,
+      password: password,
+      passwordConfirm: passwordConfirm,
+      role: role,
+    );
+
+    await _saveAuthenticatedSession(
+      loginData: registrationData,
+      fallbackUsername: username,
+    );
+  }
+
   Future<void> login({
     required String username,
     required String password,

@@ -5,6 +5,25 @@ class AuthApi {
 
   AuthApi(this._apiClient);
 
+  Future<Map<String, dynamic>> register({
+    required String username,
+    String? email,
+    required String password,
+    required String passwordConfirm,
+    required String role,
+  }) {
+    return _apiClient.post(
+      '/auth/register/',
+      body: {
+        'username': username,
+        'email': ?email,
+        'password': password,
+        'password_confirm': passwordConfirm,
+        'role': role,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> login({
     required String username,
     required String password,
