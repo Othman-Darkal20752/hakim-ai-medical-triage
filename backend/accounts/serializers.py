@@ -4,13 +4,19 @@ from rest_framework import serializers
 from .models import UserProfile
 
 
+PUBLIC_REGISTRATION_ROLE_CHOICES = [
+    (UserProfile.ROLE_PATIENT, 'Patient'),
+    (UserProfile.ROLE_DOCTOR, 'Doctor'),
+]
+
+
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(
-        choices=UserProfile.ROLE_CHOICES,
+        choices=PUBLIC_REGISTRATION_ROLE_CHOICES,
         default=UserProfile.ROLE_PATIENT,
         required=False,
     )
