@@ -7,12 +7,25 @@ import 'api_constants.dart';
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
+  final Map<String, List<String>> fieldErrors;
 
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.fieldErrors = const {},
+  });
+
+  List<String> errorsFor(String fieldName) {
+    return fieldErrors[fieldName] ?? const [];
+  }
 
   @override
   String toString() {
-    return 'ApiException(statusCode: $statusCode, message: $message)';
+    return 'ApiException('
+        'statusCode: $statusCode, '
+        'message: $message, '
+        'fieldErrors: $fieldErrors'
+        ')';
   }
 }
 
@@ -72,14 +85,93 @@ class ApiClient {
         : jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      final fieldErrors = _extractFieldErrors(body);
+
       throw ApiException(
-        body['detail']?.toString() ??
-            body['error']?.toString() ??
-            'حدث خطأ أثناء الاتصال بالخادم',
+        _extractErrorMessage(body: body, fieldErrors: fieldErrors),
         statusCode: response.statusCode,
+        fieldErrors: fieldErrors,
       );
     }
 
     return body;
+  }
+
+  Map<String, List<String>> _extractFieldErrors(Map<String, dynamic> body) {
+    final errors = <String, List<String>>{};
+
+    for (final entry in body.entries) {
+      if (entry.key == 'detail' || entry.key == 'error') {
+        continue;
+      }
+
+      final messages = _normalizeErrorMessages(entry.value);
+
+      if (messages.isNotEmpty) {
+        errors[entry.key] = List.unmodifiable(messages);
+      }
+    }
+
+    return Map.unmodifiable(errors);
+  }
+
+  String _extractErrorMessage({
+    required Map<String, dynamic> body,
+    required Map<String, List<String>> fieldErrors,
+  }) {
+    final detailMessages = _normalizeErrorMessages(body['detail']);
+
+    if (detailMessages.isNotEmpty) {
+      return detailMessages.first;
+    }
+
+    final errorMessages = _normalizeErrorMessages(body['error']);
+
+    if (errorMessages.isNotEmpty) {
+      return errorMessages.first;
+    }
+
+    final nonFieldErrors = fieldErrors['non_field_errors'];
+
+    if (nonFieldErrors != null && nonFieldErrors.isNotEmpty) {
+      return nonFieldErrors.first;
+    }
+
+    for (final messages in fieldErrors.values) {
+      if (messages.isNotEmpty) {
+        return messages.first;
+      }
+    }
+
+    return 'حدث خطأ أثناء الاتصال بالخادم';
+  }
+
+  List<String> _normalizeErrorMessages(dynamic value) {
+    if (value == null) {
+      return const [];
+    }
+
+    if (value is String) {
+      final normalized = value.trim();
+      return normalized.isEmpty ? const [] : [normalized];
+    }
+
+    if (value is Iterable) {
+      return value
+          .expand(_normalizeErrorMessages)
+          .where((message) => message.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    if (value is Map) {
+      return value.values
+          .expand(_normalizeErrorMessages)
+          .where((message) => message.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    final normalized = value.toString().trim();
+
+    return normalized.isEmpty ? const [] : [normalized];
   }
 }
