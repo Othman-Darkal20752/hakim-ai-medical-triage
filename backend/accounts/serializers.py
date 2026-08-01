@@ -1,5 +1,8 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from rest_framework import serializers
+
+from doctors.models import DoctorProfile
 
 from .models import UserProfile
 
@@ -24,6 +27,7 @@ class RegisterSerializer(serializers.Serializer):
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
             raise serializers.ValidationError('Username already exists.')
+
         return value
 
     def validate(self, attrs):
@@ -31,22 +35,30 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'password_confirm': 'Passwords do not match.',
             })
+
         return attrs
 
     def create(self, validated_data):
-        role = validated_data.pop('role', UserProfile.ROLE_PATIENT)
+        role = validated_data.pop(
+            'role',
+            UserProfile.ROLE_PATIENT,
+        )
         validated_data.pop('password_confirm')
 
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            password=validated_data['password'],
-        )
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=validated_data['username'],
+                email=validated_data.get('email', ''),
+                password=validated_data['password'],
+            )
 
-        UserProfile.objects.create(
-            user=user,
-            role=role,
-        )
+            UserProfile.objects.create(
+                user=user,
+                role=role,
+            )
+
+            if role == UserProfile.ROLE_DOCTOR:
+                DoctorProfile.objects.create(user=user)
 
         return user
 
@@ -71,4 +83,5 @@ class MeSerializer(serializers.ModelSerializer):
         except UserProfile.DoesNotExist:
             if obj.is_staff:
                 return UserProfile.ROLE_ADMIN
+
             return UserProfile.ROLE_PATIENT
