@@ -18,6 +18,7 @@ class SpecialtySerializer(serializers.ModelSerializer):
 
 
 class DoctorSelfProfileSerializer(serializers.ModelSerializer):
+    is_profile_complete = serializers.SerializerMethodField()
     specialty = SpecialtySerializer(read_only=True)
     specialty_id = serializers.PrimaryKeyRelatedField(
         source='specialty',
@@ -59,10 +60,19 @@ class DoctorSelfProfileSerializer(serializers.ModelSerializer):
         'address',
     }
 
+    PROFILE_COMPLETION_TEXT_FIELDS = (
+        'display_name',
+        'medical_license_number',
+        'phone_number',
+        'city',
+        'address',
+    )
+
     class Meta:
         model = DoctorProfile
         fields = (
             'id',
+            'is_profile_complete',
             'specialty',
             'specialty_id',
             'display_name',
@@ -85,6 +95,7 @@ class DoctorSelfProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             'id',
+            'is_profile_complete',
             'specialty',
             'verification_status',
             'verification_note',
@@ -95,6 +106,14 @@ class DoctorSelfProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         )
+
+    def get_is_profile_complete(self, obj):
+        has_required_text = all(
+            bool((getattr(obj, field, None) or '').strip())
+            for field in self.PROFILE_COMPLETION_TEXT_FIELDS
+        )
+
+        return obj.specialty_id is not None and has_required_text
 
     def to_internal_value(self, data):
         forbidden_fields = self.ADMIN_MANAGED_FIELDS.intersection(

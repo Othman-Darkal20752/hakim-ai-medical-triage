@@ -119,6 +119,7 @@ class DoctorProfileApiTests(APITestCase):
         )
         self.assertNotIn('user', response.data)
         self.assertNotIn('verified_by', response.data)
+        self.assertFalse(response.data['is_profile_complete'])
 
     def test_doctor_can_update_own_professional_data_only(self):
         self.authenticate(self.doctor_user)
@@ -156,6 +157,25 @@ class DoctorProfileApiTests(APITestCase):
             self.other_doctor_profile.display_name,
             'Doctor Two',
         )
+
+    def test_profile_reports_complete_after_required_data_is_saved(self):
+        self.authenticate(self.doctor_user)
+
+        response = self.client.patch(
+            self.doctor_me_url,
+            {
+                'display_name': 'Doctor One',
+                'specialty_id': self.active_specialty.pk,
+                'medical_license_number': 'LICENSE-001',
+                'phone_number': '+963999000000',
+                'city': 'Damascus',
+                'address': 'Clinic address',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_profile_complete'])
 
     def test_doctor_cannot_update_admin_managed_fields(self):
         self.authenticate(self.doctor_user)
@@ -214,13 +234,17 @@ class DoctorProfileApiTests(APITestCase):
         response = self.client.get(self.specialties_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(set(response.data.keys()), {'specialties'})
+
+        specialties = response.data['specialties']
+
+        self.assertEqual(len(specialties), 1)
         self.assertEqual(
-            response.data[0]['id'],
+            specialties[0]['id'],
             self.active_specialty.pk,
         )
         self.assertEqual(
-            response.data[0]['code'],
+            specialties[0]['code'],
             'cardiology',
         )
 

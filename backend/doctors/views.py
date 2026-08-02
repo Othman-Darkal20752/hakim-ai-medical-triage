@@ -50,4 +50,4 @@ class SpecialtyListView(APIView):
         specialties = Specialty.objects.filter(is_active=True)
         serializer = SpecialtySerializer(specialties, many=True)
 
-        return Response(serializer.data)
+        return Response({'specialties': serializer.data})

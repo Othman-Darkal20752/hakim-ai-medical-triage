@@ -67,6 +67,23 @@ class DoctorSelfProfileSerializerTests(TestCase):
         self.assertNotIn('verified_by', data)
         self.assertNotIn('specialty_id', data)
 
+    def test_incomplete_profile_is_reported_as_incomplete(self):
+        data = DoctorSelfProfileSerializer(self.profile).data
+
+        self.assertFalse(data['is_profile_complete'])
+
+    def test_complete_profile_is_reported_as_complete(self):
+        self.profile.specialty = self.active_specialty
+        self.profile.medical_license_number = 'LICENSE-001'
+        self.profile.phone_number = '+963999000000'
+        self.profile.city = 'Damascus'
+        self.profile.address = 'Clinic address'
+        self.profile.save()
+
+        data = DoctorSelfProfileSerializer(self.profile).data
+
+        self.assertTrue(data['is_profile_complete'])
+
     def test_updates_allowed_professional_fields(self):
         serializer = DoctorSelfProfileSerializer(
             self.profile,
