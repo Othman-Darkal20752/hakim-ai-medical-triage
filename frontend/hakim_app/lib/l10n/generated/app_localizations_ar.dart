@@ -123,4 +123,68 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get googleLoginServerError =>
       'تعذر تسجيل الدخول باستخدام Google. تحقق من الاتصال وإعدادات الخادم.';
+
+  @override
+  String get noAccountQuestion => 'ليس لديك حساب؟';
+
+  @override
+  String get createAccount => 'إنشاء حساب';
+
+  @override
+  String get alreadyHaveAccountQuestion => 'لديك حساب بالفعل؟';
+
+  @override
+  String get signInInstead => 'تسجيل الدخول';
+
+  @override
+  String get patientRegisterTitle => 'إنشاء حساب مريض';
+
+  @override
+  String get doctorRegisterTitle => 'إنشاء حساب طبيب';
+
+  @override
+  String get patientRegisterWelcome => 'ابدأ رحلتك مع حكيم';
+
+  @override
+  String get doctorRegisterWelcome => 'انضم إلى منصة حكيم';
+
+  @override
+  String get registerDescription =>
+      'أنشئ حسابك الآن. يمكنك استكمال بياناتك الأخرى لاحقًا.';
+
+  @override
+  String get emailOptionalLabel => 'البريد الإلكتروني (اختياري)';
+
+  @override
+  String get passwordConfirmLabel => 'تأكيد كلمة المرور';
+
+  @override
+  String get registerButton => 'إنشاء الحساب';
+
+  @override
+  String get usernameRequired => 'أدخل اسم المستخدم.';
+
+  @override
+  String get usernameTooLong => 'يجب ألا يتجاوز اسم المستخدم 150 محرفًا.';
+
+  @override
+  String get emailInvalid =>
+      'أدخل بريدًا إلكترونيًا صحيحًا أو اترك الحقل فارغًا.';
+
+  @override
+  String get passwordRequired => 'أدخل كلمة المرور.';
+
+  @override
+  String get passwordTooShort =>
+      'يجب أن تتكون كلمة المرور من 8 محارف على الأقل.';
+
+  @override
+  String get passwordConfirmRequired => 'أعد إدخال كلمة المرور.';
+
+  @override
+  String get passwordMismatch => 'كلمتا المرور غير متطابقتين.';
+
+  @override
+  String get registerServerError =>
+      'تعذر إنشاء الحساب. تحقق من تشغيل الخادم والاتصال بالشبكة.';
 }

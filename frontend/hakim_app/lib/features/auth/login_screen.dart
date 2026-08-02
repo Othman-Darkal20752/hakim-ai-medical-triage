@@ -4,10 +4,11 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
-import 'auth_role.dart';
 import 'authenticated_home.dart';
+import 'auth_role.dart';
 import 'data/auth_service.dart';
 import 'data/google_auth_service.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthRole role;
@@ -125,6 +126,15 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _errorMessage = message;
     });
+  }
+
+  void _openRegisterScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RegisterScreen(role: widget.role, authService: _authService),
+      ),
+    );
   }
 
   void _openAuthenticatedHome() {
@@ -258,38 +268,57 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : Text(l10n.loginButton),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          l10n.orLabel,
-                          style: const TextStyle(color: AppTheme.textLight),
-                        ),
+                      Text(
+                        l10n.noAccountQuestion,
+                        style: const TextStyle(color: AppTheme.textLight),
                       ),
-                      const Expanded(child: Divider()),
+                      TextButton(
+                        key: const Key('login_create_account_button'),
+                        onPressed: _isBusy ? null : _openRegisterScreen,
+                        child: Text(l10n.createAccount),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    onPressed: _isBusy ? null : _loginWithGoogle,
-                    icon: _isGoogleLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'G',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  if (!isDoctor) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            l10n.orLabel,
+                            style: const TextStyle(color: AppTheme.textLight),
                           ),
-                    label: Text(l10n.continueWithGoogle),
-                  ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      key: const Key('login_google_button'),
+                      onPressed: _isBusy ? null : _loginWithGoogle,
+                      icon: _isGoogleLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'G',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                      label: Text(l10n.continueWithGoogle),
+                    ),
+                  ],
                 ],
               ),
             ),

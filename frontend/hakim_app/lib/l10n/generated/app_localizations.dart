@@ -307,6 +307,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to sign in with Google. Check the connection and server configuration.'**
   String get googleLoginServerError;
+
+  /// No description provided for @noAccountQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account?'**
+  String get noAccountQuestion;
+
+  /// No description provided for @createAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Account'**
+  String get createAccount;
+
+  /// No description provided for @alreadyHaveAccountQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get alreadyHaveAccountQuestion;
+
+  /// No description provided for @signInInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signInInstead;
+
+  /// No description provided for @patientRegisterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Patient Account'**
+  String get patientRegisterTitle;
+
+  /// No description provided for @doctorRegisterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Doctor Account'**
+  String get doctorRegisterTitle;
+
+  /// No description provided for @patientRegisterWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with Hakim'**
+  String get patientRegisterWelcome;
+
+  /// No description provided for @doctorRegisterWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Hakim'**
+  String get doctorRegisterWelcome;
+
+  /// No description provided for @registerDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your account now. You can complete the rest of your information later.'**
+  String get registerDescription;
+
+  /// No description provided for @emailOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email (optional)'**
+  String get emailOptionalLabel;
+
+  /// No description provided for @passwordConfirmLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Password'**
+  String get passwordConfirmLabel;
+
+  /// No description provided for @registerButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Account'**
+  String get registerButton;
+
+  /// No description provided for @usernameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a username.'**
+  String get usernameRequired;
+
+  /// No description provided for @usernameTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'The username must not exceed 150 characters.'**
+  String get usernameTooLong;
+
+  /// No description provided for @emailInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address or leave the field empty.'**
+  String get emailInvalid;
+
+  /// No description provided for @passwordRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a password.'**
+  String get passwordRequired;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'The password must contain at least 8 characters.'**
+  String get passwordTooShort;
+
+  /// No description provided for @passwordConfirmRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the password again.'**
+  String get passwordConfirmRequired;
+
+  /// No description provided for @passwordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match.'**
+  String get passwordMismatch;
+
+  /// No description provided for @registerServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to create the account. Check that the server is running and that you are connected to the network.'**
+  String get registerServerError;
 }
 
 class _AppLocalizationsDelegate

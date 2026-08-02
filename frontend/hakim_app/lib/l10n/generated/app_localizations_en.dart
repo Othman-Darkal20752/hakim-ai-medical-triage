@@ -124,4 +124,68 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get googleLoginServerError =>
       'Unable to sign in with Google. Check the connection and server configuration.';
+
+  @override
+  String get noAccountQuestion => 'Don\'t have an account?';
+
+  @override
+  String get createAccount => 'Create Account';
+
+  @override
+  String get alreadyHaveAccountQuestion => 'Already have an account?';
+
+  @override
+  String get signInInstead => 'Sign In';
+
+  @override
+  String get patientRegisterTitle => 'Create Patient Account';
+
+  @override
+  String get doctorRegisterTitle => 'Create Doctor Account';
+
+  @override
+  String get patientRegisterWelcome => 'Start with Hakim';
+
+  @override
+  String get doctorRegisterWelcome => 'Join Hakim';
+
+  @override
+  String get registerDescription =>
+      'Create your account now. You can complete the rest of your information later.';
+
+  @override
+  String get emailOptionalLabel => 'Email (optional)';
+
+  @override
+  String get passwordConfirmLabel => 'Confirm Password';
+
+  @override
+  String get registerButton => 'Create Account';
+
+  @override
+  String get usernameRequired => 'Enter a username.';
+
+  @override
+  String get usernameTooLong => 'The username must not exceed 150 characters.';
+
+  @override
+  String get emailInvalid =>
+      'Enter a valid email address or leave the field empty.';
+
+  @override
+  String get passwordRequired => 'Enter a password.';
+
+  @override
+  String get passwordTooShort =>
+      'The password must contain at least 8 characters.';
+
+  @override
+  String get passwordConfirmRequired => 'Enter the password again.';
+
+  @override
+  String get passwordMismatch => 'The passwords do not match.';
+
+  @override
+  String get registerServerError =>
+      'Unable to create the account. Check that the server is running and that you are connected to the network.';
 }
