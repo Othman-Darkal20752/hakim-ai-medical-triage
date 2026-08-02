@@ -466,6 +466,134 @@ void main() {
       expect(invalidationCallCount, 0);
     });
 
+    test(
+      'sends an authenticated PATCH request with the stored access token',
+      () async {
+        final tokenStorage = _FakeTokenStorage()
+          ..accessToken = 'access-token'
+          ..refreshToken = 'refresh-token';
+
+        const requestBody = {'display_name': 'Doctor One', 'specialty_id': 1};
+
+        var requestCount = 0;
+        var invalidationCallCount = 0;
+
+        final client = MockClient((request) async {
+          requestCount++;
+
+          expect(request.method, 'PATCH');
+          expect(request.url.path.endsWith('/doctors/me/'), isTrue);
+          expect(request.headers['Authorization'], 'Bearer access-token');
+          expect(jsonDecode(request.body), requestBody);
+
+          return http.Response(
+            jsonEncode({'is_profile_complete': true}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+
+        final authenticatedClient = _buildAuthenticatedApiClient(
+          tokenStorage: tokenStorage,
+          client: client,
+          invalidateLocalSession: () async {
+            invalidationCallCount++;
+          },
+        );
+
+        final result = await authenticatedClient.patch(
+          '/doctors/me/',
+          body: requestBody,
+        );
+
+        expect(result, {'is_profile_complete': true});
+        expect(requestCount, 1);
+        expect(tokenStorage.saveAccessTokenCallCount, 0);
+        expect(invalidationCallCount, 0);
+      },
+    );
+
+    test(
+      'refreshes and retries PATCH once with the same request body',
+      () async {
+        final tokenStorage = _FakeTokenStorage()
+          ..accessToken = 'old-access-token'
+          ..refreshToken = 'refresh-token';
+
+        const requestBody = {'display_name': 'Doctor One', 'specialty_id': 1};
+
+        var protectedRequestCount = 0;
+        var refreshRequestCount = 0;
+        var invalidationCallCount = 0;
+
+        final authorizationHeaders = <String?>[];
+        final requestBodies = <Map<String, dynamic>>[];
+
+        final client = MockClient((request) async {
+          if (request.url.path.endsWith('/auth/refresh/')) {
+            refreshRequestCount++;
+
+            expect(request.method, 'POST');
+            expect(jsonDecode(request.body), {'refresh': 'refresh-token'});
+
+            return http.Response(
+              jsonEncode({'access': 'new-access-token'}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+
+          protectedRequestCount++;
+          authorizationHeaders.add(request.headers['Authorization']);
+          requestBodies.add(
+            Map<String, dynamic>.from(jsonDecode(request.body) as Map),
+          );
+
+          expect(request.method, 'PATCH');
+          expect(request.url.path.endsWith('/doctors/me/'), isTrue);
+
+          if (protectedRequestCount == 1) {
+            return http.Response(
+              jsonEncode({'detail': 'Access token expired.'}),
+              401,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+
+          return http.Response(
+            jsonEncode({'is_profile_complete': true}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+
+        final authenticatedClient = _buildAuthenticatedApiClient(
+          tokenStorage: tokenStorage,
+          client: client,
+          invalidateLocalSession: () async {
+            invalidationCallCount++;
+          },
+        );
+
+        final result = await authenticatedClient.patch(
+          '/doctors/me/',
+          body: requestBody,
+        );
+
+        expect(result, {'is_profile_complete': true});
+        expect(protectedRequestCount, 2);
+        expect(refreshRequestCount, 1);
+        expect(authorizationHeaders, [
+          'Bearer old-access-token',
+          'Bearer new-access-token',
+        ]);
+        expect(requestBodies, [requestBody, requestBody]);
+        expect(tokenStorage.savedAccessToken, 'new-access-token');
+        expect(tokenStorage.saveAccessTokenCallCount, 1);
+        expect(invalidationCallCount, 0);
+      },
+    );
+
     test('refreshes after 401 and retries once with the new token', () async {
       final tokenStorage = _FakeTokenStorage()
         ..accessToken = 'old-access-token'

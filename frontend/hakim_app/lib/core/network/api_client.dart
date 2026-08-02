@@ -63,6 +63,22 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    required Map<String, dynamic> body,
+    String? token,
+  }) async {
+    final response = await _client
+        .patch(
+          _buildUri(path),
+          headers: _buildHeaders(token),
+          body: jsonEncode(body),
+        )
+        .timeout(ApiConstants.timeout);
+
+    return _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> delete(String path, {String? token}) async {
     final response = await _client
         .delete(_buildUri(path), headers: _buildHeaders(token))

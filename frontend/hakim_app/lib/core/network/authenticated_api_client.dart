@@ -42,6 +42,15 @@ class AuthenticatedApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    required Map<String, dynamic> body,
+  }) {
+    return _sendWithAuthentication(
+      (accessToken) => _apiClient.patch(path, body: body, token: accessToken),
+    );
+  }
+
   Future<Map<String, dynamic>> delete(String path) {
     return _sendWithAuthentication(
       (accessToken) => _apiClient.delete(path, token: accessToken),

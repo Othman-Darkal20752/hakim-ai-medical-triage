@@ -84,5 +84,54 @@ void main() {
         ),
       );
     });
+
+    test('PATCH preserves DRF field validation errors', () async {
+      const requestBody = {
+        'medical_license_number': 'LICENSE-001',
+        'city': 'Damascus',
+      };
+
+      final client = MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.path.endsWith('/doctors/me/'), isTrue);
+        expect(request.headers['Authorization'], 'Bearer access-token');
+        expect(jsonDecode(request.body), requestBody);
+
+        return http.Response(
+          jsonEncode({
+            'medical_license_number': [
+              'A doctor profile with this medical license number already exists.',
+            ],
+            'city': ['This field is invalid.'],
+          }),
+          400,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final apiClient = ApiClient(client: client);
+
+      await expectLater(
+        apiClient.patch(
+          '/doctors/me/',
+          body: requestBody,
+          token: 'access-token',
+        ),
+        throwsA(
+          isA<ApiException>()
+              .having((error) => error.statusCode, 'statusCode', 400)
+              .having(
+                (error) => error.errorsFor('medical_license_number'),
+                'medical license errors',
+                [
+                  'A doctor profile with this medical license number already exists.',
+                ],
+              )
+              .having((error) => error.errorsFor('city'), 'city errors', [
+                'This field is invalid.',
+              ]),
+        ),
+      );
+    });
   });
 }
