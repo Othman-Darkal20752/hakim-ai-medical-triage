@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../chat/chat_screen.dart';
-import '../doctor/doctor_home_screen.dart';
+import '../doctor/doctor_flow_gate.dart';
 import '../onboarding/welcome_screen.dart';
 import 'data/auth_service.dart';
 
@@ -56,7 +56,7 @@ class _AuthenticatedHomeState extends State<AuthenticatedHome> {
                 ChatScreen(authService: _authService),
           'doctor' =>
             widget.doctorBuilder?.call(context) ??
-                DoctorHomeScreen(authService: _authService),
+                DoctorFlowGate(authService: _authService),
           _ =>
             widget.unsupportedBuilder?.call(context) ??
                 _UnsupportedMobileRoleScreen(authService: _authService),
