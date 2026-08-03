@@ -188,4 +188,73 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get registerServerError =>
       'Unable to create the account. Check that the server is running and that you are connected to the network.';
+
+  @override
+  String get doctorProfileSetupTitle => 'Complete Doctor Profile';
+
+  @override
+  String get doctorProfileSetupDescription =>
+      'Enter your core professional information. The administration will review your profile before it appears to patients.';
+
+  @override
+  String get displayNameLabel => 'Professional name';
+
+  @override
+  String get specialtyLabel => 'Medical specialty';
+
+  @override
+  String get medicalLicenseNumberLabel => 'Medical license number';
+
+  @override
+  String get phoneNumberLabel => 'Phone number';
+
+  @override
+  String get whatsappNumberOptionalLabel => 'WhatsApp number (optional)';
+
+  @override
+  String get cityLabel => 'City';
+
+  @override
+  String get addressLabel => 'Address';
+
+  @override
+  String get bioOptionalLabel => 'Professional bio (optional)';
+
+  @override
+  String get yearsOfExperienceOptionalLabel => 'Years of experience (optional)';
+
+  @override
+  String get workingHoursOptionalLabel => 'Working hours (optional)';
+
+  @override
+  String get saveDoctorProfileButton => 'Save Profile';
+
+  @override
+  String get requiredField => 'This field is required.';
+
+  @override
+  String get specialtyRequired => 'Select a medical specialty.';
+
+  @override
+  String get yearsOfExperienceInvalid => 'Enter a non-negative whole number.';
+
+  @override
+  String get specialtiesLoadError => 'Unable to load medical specialties.';
+
+  @override
+  String get specialtiesEmpty =>
+      'No medical specialties are currently available.';
+
+  @override
+  String get retryButton => 'Try Again';
+
+  @override
+  String get doctorProfileSaveError =>
+      'Unable to save the doctor profile. Check your connection and try again.';
+
+  @override
+  String get logoutButton => 'Log out';
+
+  @override
+  String get logoutError => 'Unable to log out. Please try again.';
 }

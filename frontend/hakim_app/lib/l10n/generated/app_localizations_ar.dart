@@ -187,4 +187,72 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get registerServerError =>
       'تعذر إنشاء الحساب. تحقق من تشغيل الخادم والاتصال بالشبكة.';
+
+  @override
+  String get doctorProfileSetupTitle => 'استكمال ملف الطبيب';
+
+  @override
+  String get doctorProfileSetupDescription =>
+      'أدخل بياناتك المهنية الأساسية. ستراجع الإدارة الملف قبل ظهوره للمرضى.';
+
+  @override
+  String get displayNameLabel => 'الاسم المهني';
+
+  @override
+  String get specialtyLabel => 'الاختصاص الطبي';
+
+  @override
+  String get medicalLicenseNumberLabel => 'رقم الترخيص الطبي';
+
+  @override
+  String get phoneNumberLabel => 'رقم الهاتف';
+
+  @override
+  String get whatsappNumberOptionalLabel => 'رقم واتساب (اختياري)';
+
+  @override
+  String get cityLabel => 'المدينة';
+
+  @override
+  String get addressLabel => 'العنوان';
+
+  @override
+  String get bioOptionalLabel => 'نبذة مهنية (اختياري)';
+
+  @override
+  String get yearsOfExperienceOptionalLabel => 'سنوات الخبرة (اختياري)';
+
+  @override
+  String get workingHoursOptionalLabel => 'ساعات العمل (اختياري)';
+
+  @override
+  String get saveDoctorProfileButton => 'حفظ الملف';
+
+  @override
+  String get requiredField => 'هذا الحقل مطلوب.';
+
+  @override
+  String get specialtyRequired => 'اختر الاختصاص الطبي.';
+
+  @override
+  String get yearsOfExperienceInvalid => 'أدخل عددًا صحيحًا غير سالب.';
+
+  @override
+  String get specialtiesLoadError => 'تعذر تحميل الاختصاصات الطبية.';
+
+  @override
+  String get specialtiesEmpty => 'لا توجد اختصاصات متاحة حاليًا.';
+
+  @override
+  String get retryButton => 'إعادة المحاولة';
+
+  @override
+  String get doctorProfileSaveError =>
+      'تعذر حفظ ملف الطبيب. تحقق من الاتصال وحاول مرة أخرى.';
+
+  @override
+  String get logoutButton => 'تسجيل الخروج';
+
+  @override
+  String get logoutError => 'تعذر تسجيل الخروج. حاول مرة أخرى.';
 }

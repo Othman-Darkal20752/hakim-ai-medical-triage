@@ -427,6 +427,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to create the account. Check that the server is running and that you are connected to the network.'**
   String get registerServerError;
+
+  /// No description provided for @doctorProfileSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Doctor Profile'**
+  String get doctorProfileSetupTitle;
+
+  /// No description provided for @doctorProfileSetupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your core professional information. The administration will review your profile before it appears to patients.'**
+  String get doctorProfileSetupDescription;
+
+  /// No description provided for @displayNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional name'**
+  String get displayNameLabel;
+
+  /// No description provided for @specialtyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical specialty'**
+  String get specialtyLabel;
+
+  /// No description provided for @medicalLicenseNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical license number'**
+  String get medicalLicenseNumberLabel;
+
+  /// No description provided for @phoneNumberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get phoneNumberLabel;
+
+  /// No description provided for @whatsappNumberOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp number (optional)'**
+  String get whatsappNumberOptionalLabel;
+
+  /// No description provided for @cityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get cityLabel;
+
+  /// No description provided for @addressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get addressLabel;
+
+  /// No description provided for @bioOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional bio (optional)'**
+  String get bioOptionalLabel;
+
+  /// No description provided for @yearsOfExperienceOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Years of experience (optional)'**
+  String get yearsOfExperienceOptionalLabel;
+
+  /// No description provided for @workingHoursOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Working hours (optional)'**
+  String get workingHoursOptionalLabel;
+
+  /// No description provided for @saveDoctorProfileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Profile'**
+  String get saveDoctorProfileButton;
+
+  /// No description provided for @requiredField.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required.'**
+  String get requiredField;
+
+  /// No description provided for @specialtyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a medical specialty.'**
+  String get specialtyRequired;
+
+  /// No description provided for @yearsOfExperienceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a non-negative whole number.'**
+  String get yearsOfExperienceInvalid;
+
+  /// No description provided for @specialtiesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load medical specialties.'**
+  String get specialtiesLoadError;
+
+  /// No description provided for @specialtiesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No medical specialties are currently available.'**
+  String get specialtiesEmpty;
+
+  /// No description provided for @retryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get retryButton;
+
+  /// No description provided for @doctorProfileSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save the doctor profile. Check your connection and try again.'**
+  String get doctorProfileSaveError;
+
+  /// No description provided for @logoutButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logoutButton;
+
+  /// No description provided for @logoutError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to log out. Please try again.'**
+  String get logoutError;
 }
 
 class _AppLocalizationsDelegate
