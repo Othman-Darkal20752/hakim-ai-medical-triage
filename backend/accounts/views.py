@@ -11,6 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from patients.models import PatientHealthProfile
+
 from .models import ExternalIdentity, UserProfile
 from .serializers import (
     GoogleLoginSerializer,
@@ -164,10 +166,13 @@ class GoogleLoginView(APIView):
                     email=email,
                 )
 
-            UserProfile.objects.get_or_create(
+            user_profile, _ = UserProfile.objects.get_or_create(
                 user=user,
                 defaults={'role': UserProfile.ROLE_PATIENT},
             )
+
+            if user_profile.role == UserProfile.ROLE_PATIENT:
+                PatientHealthProfile.objects.get_or_create(user=user)
 
         if not user.is_active:
             return Response(

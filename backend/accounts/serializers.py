@@ -3,6 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from doctors.models import DoctorProfile
+from patients.models import PatientHealthProfile
 
 from .models import UserProfile
 
@@ -57,7 +58,9 @@ class RegisterSerializer(serializers.Serializer):
                 role=role,
             )
 
-            if role == UserProfile.ROLE_DOCTOR:
+            if role == UserProfile.ROLE_PATIENT:
+                PatientHealthProfile.objects.create(user=user)
+            elif role == UserProfile.ROLE_DOCTOR:
                 DoctorProfile.objects.create(user=user)
 
         return user

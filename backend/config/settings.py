@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'accounts',
     'chat',
     'doctors.apps.DoctorsConfig',
+    'patients.apps.PatientsConfig',
 ]
 
 MIDDLEWARE = [
