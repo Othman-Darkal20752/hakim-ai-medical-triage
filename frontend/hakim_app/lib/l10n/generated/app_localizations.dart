@@ -559,6 +559,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to log out. Please try again.'**
   String get logoutError;
+
+  /// No description provided for @patientHealthProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Health Profile'**
+  String get patientHealthProfileTitle;
+
+  /// No description provided for @patientHealthProfileDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your core health information updated so Hakim can use only the minimum necessary context during preliminary medical guidance.'**
+  String get patientHealthProfileDescription;
+
+  /// No description provided for @patientHealthProfilePrivacyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This is sensitive health information. It must remain limited to your account and authorized medical guidance purposes.'**
+  String get patientHealthProfilePrivacyNote;
+
+  /// No description provided for @medicalHistorySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical History'**
+  String get medicalHistorySectionTitle;
+
+  /// No description provided for @lifestyleSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional Health Information'**
+  String get lifestyleSectionTitle;
+
+  /// No description provided for @chronicConditionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chronic conditions'**
+  String get chronicConditionsLabel;
+
+  /// No description provided for @allergiesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allergies'**
+  String get allergiesLabel;
+
+  /// No description provided for @currentMedicationsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current medications'**
+  String get currentMedicationsLabel;
+
+  /// No description provided for @previousSurgeriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous surgeries'**
+  String get previousSurgeriesLabel;
+
+  /// No description provided for @oneItemPerLineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter each item on a separate line.'**
+  String get oneItemPerLineHint;
+
+  /// No description provided for @smokingStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Smoking status'**
+  String get smokingStatusLabel;
+
+  /// No description provided for @alcoholUseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Alcohol use'**
+  String get alcoholUseLabel;
+
+  /// No description provided for @pregnancyStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pregnancy status'**
+  String get pregnancyStatusLabel;
+
+  /// No description provided for @statusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get statusUnknown;
+
+  /// No description provided for @statusNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get statusNever;
+
+  /// No description provided for @statusFormer.
+  ///
+  /// In en, this message translates to:
+  /// **'Former'**
+  String get statusFormer;
+
+  /// No description provided for @statusCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get statusCurrent;
+
+  /// No description provided for @pregnancyNotApplicable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applicable'**
+  String get pregnancyNotApplicable;
+
+  /// No description provided for @pregnancyNotPregnant.
+  ///
+  /// In en, this message translates to:
+  /// **'Not pregnant'**
+  String get pregnancyNotPregnant;
+
+  /// No description provided for @pregnancyPregnant.
+  ///
+  /// In en, this message translates to:
+  /// **'Pregnant'**
+  String get pregnancyPregnant;
+
+  /// No description provided for @saveHealthProfileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Health Profile'**
+  String get saveHealthProfileButton;
+
+  /// No description provided for @healthProfileLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load the health profile. Check your connection and try again.'**
+  String get healthProfileLoadError;
+
+  /// No description provided for @healthProfileSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save the health profile. Check your connection and try again.'**
+  String get healthProfileSaveError;
+
+  /// No description provided for @healthProfileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Health profile saved successfully.'**
+  String get healthProfileSaved;
+
+  /// No description provided for @healthProfileListTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'A maximum of 50 items is allowed.'**
+  String get healthProfileListTooMany;
+
+  /// No description provided for @healthProfileItemTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Each item must not exceed 200 characters.'**
+  String get healthProfileItemTooLong;
+
+  /// No description provided for @healthProfileLastReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'Information last reviewed'**
+  String get healthProfileLastReviewed;
+
+  /// No description provided for @healthProfileNeverReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'The information has not been reviewed yet'**
+  String get healthProfileNeverReviewed;
 }
 
 class _AppLocalizationsDelegate

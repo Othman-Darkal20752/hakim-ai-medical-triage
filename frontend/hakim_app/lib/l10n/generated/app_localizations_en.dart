@@ -257,4 +257,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logoutError => 'Unable to log out. Please try again.';
+
+  @override
+  String get patientHealthProfileTitle => 'My Health Profile';
+
+  @override
+  String get patientHealthProfileDescription =>
+      'Keep your core health information updated so Hakim can use only the minimum necessary context during preliminary medical guidance.';
+
+  @override
+  String get patientHealthProfilePrivacyNote =>
+      'This is sensitive health information. It must remain limited to your account and authorized medical guidance purposes.';
+
+  @override
+  String get medicalHistorySectionTitle => 'Medical History';
+
+  @override
+  String get lifestyleSectionTitle => 'Additional Health Information';
+
+  @override
+  String get chronicConditionsLabel => 'Chronic conditions';
+
+  @override
+  String get allergiesLabel => 'Allergies';
+
+  @override
+  String get currentMedicationsLabel => 'Current medications';
+
+  @override
+  String get previousSurgeriesLabel => 'Previous surgeries';
+
+  @override
+  String get oneItemPerLineHint => 'Enter each item on a separate line.';
+
+  @override
+  String get smokingStatusLabel => 'Smoking status';
+
+  @override
+  String get alcoholUseLabel => 'Alcohol use';
+
+  @override
+  String get pregnancyStatusLabel => 'Pregnancy status';
+
+  @override
+  String get statusUnknown => 'Unknown';
+
+  @override
+  String get statusNever => 'Never';
+
+  @override
+  String get statusFormer => 'Former';
+
+  @override
+  String get statusCurrent => 'Current';
+
+  @override
+  String get pregnancyNotApplicable => 'Not applicable';
+
+  @override
+  String get pregnancyNotPregnant => 'Not pregnant';
+
+  @override
+  String get pregnancyPregnant => 'Pregnant';
+
+  @override
+  String get saveHealthProfileButton => 'Save Health Profile';
+
+  @override
+  String get healthProfileLoadError =>
+      'Unable to load the health profile. Check your connection and try again.';
+
+  @override
+  String get healthProfileSaveError =>
+      'Unable to save the health profile. Check your connection and try again.';
+
+  @override
+  String get healthProfileSaved => 'Health profile saved successfully.';
+
+  @override
+  String get healthProfileListTooMany => 'A maximum of 50 items is allowed.';
+
+  @override
+  String get healthProfileItemTooLong =>
+      'Each item must not exceed 200 characters.';
+
+  @override
+  String get healthProfileLastReviewed => 'Information last reviewed';
+
+  @override
+  String get healthProfileNeverReviewed =>
+      'The information has not been reviewed yet';
 }

@@ -255,4 +255,92 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get logoutError => 'تعذر تسجيل الخروج. حاول مرة أخرى.';
+
+  @override
+  String get patientHealthProfileTitle => 'ملفي الصحي';
+
+  @override
+  String get patientHealthProfileDescription =>
+      'حدّث معلوماتك الصحية الأساسية حتى يستخدم حكيم الحد الأدنى الضروري منها أثناء الإرشاد الطبي الأولي.';
+
+  @override
+  String get patientHealthProfilePrivacyNote =>
+      'هذه المعلومات صحية وحساسة، ولا يجب عرضها إلا ضمن حسابك أو استخدامها خارج الغرض الطبي المصرح به.';
+
+  @override
+  String get medicalHistorySectionTitle => 'التاريخ الصحي';
+
+  @override
+  String get lifestyleSectionTitle => 'معلومات صحية إضافية';
+
+  @override
+  String get chronicConditionsLabel => 'الأمراض المزمنة';
+
+  @override
+  String get allergiesLabel => 'الحساسيات';
+
+  @override
+  String get currentMedicationsLabel => 'الأدوية الحالية';
+
+  @override
+  String get previousSurgeriesLabel => 'العمليات السابقة';
+
+  @override
+  String get oneItemPerLineHint => 'اكتب كل معلومة في سطر مستقل.';
+
+  @override
+  String get smokingStatusLabel => 'حالة التدخين';
+
+  @override
+  String get alcoholUseLabel => 'استخدام الكحول';
+
+  @override
+  String get pregnancyStatusLabel => 'حالة الحمل';
+
+  @override
+  String get statusUnknown => 'غير معروف';
+
+  @override
+  String get statusNever => 'أبدًا';
+
+  @override
+  String get statusFormer => 'سابقًا';
+
+  @override
+  String get statusCurrent => 'حاليًا';
+
+  @override
+  String get pregnancyNotApplicable => 'لا ينطبق';
+
+  @override
+  String get pregnancyNotPregnant => 'غير حامل';
+
+  @override
+  String get pregnancyPregnant => 'حامل';
+
+  @override
+  String get saveHealthProfileButton => 'حفظ الملف الصحي';
+
+  @override
+  String get healthProfileLoadError =>
+      'تعذر تحميل الملف الصحي. تحقق من الاتصال وحاول مرة أخرى.';
+
+  @override
+  String get healthProfileSaveError =>
+      'تعذر حفظ الملف الصحي. تحقق من الاتصال وحاول مرة أخرى.';
+
+  @override
+  String get healthProfileSaved => 'تم حفظ الملف الصحي بنجاح.';
+
+  @override
+  String get healthProfileListTooMany => 'الحد الأقصى المسموح هو 50 عنصرًا.';
+
+  @override
+  String get healthProfileItemTooLong => 'يجب ألا يتجاوز كل عنصر 200 محرف.';
+
+  @override
+  String get healthProfileLastReviewed => 'آخر مراجعة للمعلومات';
+
+  @override
+  String get healthProfileNeverReviewed => 'لم تتم مراجعة المعلومات بعد';
 }
