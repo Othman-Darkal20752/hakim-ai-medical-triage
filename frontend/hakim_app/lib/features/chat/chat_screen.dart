@@ -5,12 +5,14 @@ import '../../l10n/generated/app_localizations.dart';
 import '../auth/data/auth_service.dart';
 import '../auth/data/session_expired_exception.dart';
 import '../onboarding/welcome_screen.dart';
+import '../patient/patient_health_profile_screen.dart';
 import 'data/chat_api.dart';
 import 'data/chat_message_dto.dart';
 import 'data/chat_reply_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final AuthService? authService;
+  final WidgetBuilder? healthProfileBuilder;
   final String? initialSessionId;
   final List<ChatMessageDto> initialMessages;
   final bool isReadOnly;
@@ -18,6 +20,7 @@ class ChatScreen extends StatefulWidget {
   const ChatScreen({
     super.key,
     this.authService,
+    this.healthProfileBuilder,
     this.initialSessionId,
     this.initialMessages = const [],
     this.isReadOnly = false,
@@ -243,6 +246,24 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: Text(l10n.hakimChat),
         actions: [
+          IconButton(
+            key: const Key('chat-health-profile'),
+            tooltip: l10n.patientHealthProfileTitle,
+            onPressed: _isLoggingOut
+                ? null
+                : () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder:
+                            widget.healthProfileBuilder ??
+                            (_) => PatientHealthProfileScreen(
+                              authService: _authService,
+                            ),
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.health_and_safety_outlined),
+          ),
           if (widget.initialSessionId == null)
             IconButton(
               tooltip: 'المحادثات السابقة',
