@@ -8,9 +8,13 @@ class ChatApi {
 
   Future<ChatReplyResult> sendMessage({
     required String message,
+    required String language,
     String? sessionId,
   }) async {
-    final body = <String, dynamic>{'message': message};
+    final body = <String, dynamic>{
+      'message': message,
+      'language': language,
+    };
 
     if (sessionId != null) {
       body['session_id'] = sessionId;

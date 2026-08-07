@@ -114,6 +114,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final result = await _chatReplyService.getReply(
         message: text,
+        language: Localizations.localeOf(context).languageCode,
         sessionId: _sessionId,
       );
 

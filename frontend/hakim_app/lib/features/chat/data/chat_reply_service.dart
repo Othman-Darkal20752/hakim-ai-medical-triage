@@ -13,10 +13,15 @@ class ChatReplyService {
 
   Future<ChatReplyResult> getReply({
     required String message,
+    required String language,
     String? sessionId,
   }) async {
     if (useApi && chatApi != null) {
-      return chatApi!.sendMessage(message: message, sessionId: sessionId);
+      return chatApi!.sendMessage(
+        message: message,
+        language: language,
+        sessionId: sessionId,
+      );
     }
 
     await Future.delayed(const Duration(milliseconds: 700));
@@ -47,7 +52,10 @@ class ChatReplyService {
     ]);
 
     if (hasEmergencyFlag) {
-      return 'تنبيه مهم: بعض الأعراض التي ذكرتها قد تحتاج إلى رعاية عاجلة، خاصة إذا كانت شديدة أو ظهرت بشكل مفاجئ. يرجى مراجعة الطوارئ أو الاتصال بالإسعاف فوراً. حكيم يساعد في التوجيه الأولي فقط ولا يقدم تشخيصاً نهائياً.';
+      return 'تنبيه مهم: بعض الأعراض التي ذكرتها قد تحتاج إلى رعاية عاجلة، '
+          'خاصة إذا كانت شديدة أو ظهرت بشكل مفاجئ. '
+          'يرجى مراجعة الطوارئ أو الاتصال بالإسعاف فوراً. '
+          'حكيم يساعد في التوجيه الأولي فقط ولا يقدم تشخيصاً نهائياً.';
     }
 
     return 'فهمت عليك. حتى أقدر أوجهك بشكل أفضل، أحتاج منك بعض التفاصيل:\n\n'

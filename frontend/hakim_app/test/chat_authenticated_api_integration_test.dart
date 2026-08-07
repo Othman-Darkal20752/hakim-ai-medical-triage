@@ -11,7 +11,7 @@ import 'package:hakim_app/features/chat/data/chat_api.dart';
 void main() {
   test(
     'ChatApi sends a protected message through AuthenticatedApiClient',
-    () async {
+        () async {
       var requestCount = 0;
 
       final httpClient = MockClient((request) async {
@@ -20,8 +20,10 @@ void main() {
         expect(request.method, 'POST');
         expect(request.url.path.endsWith('/chat/messages/'), isTrue);
         expect(request.headers['Authorization'], 'Bearer access-token');
+
         expect(jsonDecode(request.body), {
           'message': 'I have a headache.',
+          'language': 'en',
           'session_id': 'session-42',
         });
 
@@ -31,7 +33,9 @@ void main() {
             'session_id': 'session-42',
           }),
           200,
-          headers: {'content-type': 'application/json'},
+          headers: {
+            'content-type': 'application/json',
+          },
         );
       });
 
@@ -48,7 +52,11 @@ void main() {
 
       final result = await ChatApi(
         authenticatedClient,
-      ).sendMessage(message: 'I have a headache.', sessionId: 'session-42');
+      ).sendMessage(
+        message: 'I have a headache.',
+        language: 'en',
+        sessionId: 'session-42',
+      );
 
       expect(result.reply, 'Preliminary medical guidance.');
       expect(result.sessionId, 'session-42');
