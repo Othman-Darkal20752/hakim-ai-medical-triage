@@ -66,10 +66,17 @@ def chat_messages(request):
 
     user_text = str(payload.get("message", "")).strip()
     session_id = payload.get("session_id")
+    language = payload.get("language")
 
     if not user_text:
         return JsonResponse(
             {"error": "Message is required"},
+            status=400,
+        )
+
+    if language not in {"ar", "en"}:
+        return JsonResponse(
+            {"error": "Language must be 'ar' or 'en'"},
             status=400,
         )
 

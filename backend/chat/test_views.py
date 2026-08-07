@@ -22,7 +22,10 @@ class ChatMessageAuthenticationTests(APITestCase):
     def test_unauthenticated_user_cannot_create_chat_session(self):
         response = self.client.post(
             self.url,
-            {"message": "I have a headache."},
+            {
+                "message": "I have a headache.",
+                "language": "en",
+            },
             format="json",
         )
 
@@ -38,7 +41,10 @@ class ChatMessageAuthenticationTests(APITestCase):
 
         response = self.client.post(
             self.url,
-            {"message": "I have a mild headache."},
+            {
+                "message": "I have a mild headache.",
+                "language": "en",
+            },
             format="json",
         )
 
@@ -62,6 +68,7 @@ class ChatMessageAuthenticationTests(APITestCase):
             {
                 "message": "The headache started yesterday.",
                 "session_id": str(session.id),
+                "language": "en",
             },
             format="json",
         )
@@ -82,6 +89,7 @@ class ChatMessageAuthenticationTests(APITestCase):
             {
                 "message": "Attempt to access another session.",
                 "session_id": str(session.id),
+                "language": "en",
             },
             format="json",
         )
@@ -102,6 +110,7 @@ class ChatMessageAuthenticationTests(APITestCase):
             {
                 "message": "Attempt to claim anonymous session.",
                 "session_id": str(session.id),
+                "language": "en",
             },
             format="json",
         )
@@ -115,3 +124,59 @@ class ChatMessageAuthenticationTests(APITestCase):
 
         self.assertIsNone(session.user)
         self.assertEqual(session.messages.count(), 0)
+
+    def test_authenticated_user_can_send_arabic_language(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "message": "أشعر بصداع منذ الصباح.",
+                "language": "ar",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        self.assertEqual(ChatSession.objects.count(), 1)
+        self.assertEqual(ChatMessage.objects.count(), 2)
+
+    def test_missing_language_is_rejected(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "message": "I have a headache.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(ChatSession.objects.count(), 0)
+        self.assertEqual(ChatMessage.objects.count(), 0)
+
+    def test_invalid_language_is_rejected(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "message": "I have a headache.",
+                "language": "fr",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(ChatSession.objects.count(), 0)
+        self.assertEqual(ChatMessage.objects.count(), 0)
