@@ -11,6 +11,8 @@ from .models import DoctorProfile, Specialty
 
 class DoctorProfileApiTests(APITestCase):
     def setUp(self):
+        Specialty.objects.all().delete()
+
         self.patient_user = User.objects.create_user(
             username='patient-user',
             password='StrongPassword123',

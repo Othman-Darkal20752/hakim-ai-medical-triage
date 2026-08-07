@@ -17,6 +17,9 @@ User = get_user_model()
 
 
 class SpecialtyModelTests(TestCase):
+    def setUp(self):
+        Specialty.objects.all().delete()
+
     def test_create_specialty_with_expected_defaults(self):
         specialty = Specialty.objects.create(
             code='cardiology',

@@ -10,6 +10,9 @@ from .serializers import (
 
 
 class SpecialtySerializerTests(TestCase):
+    def setUp(self):
+        Specialty.objects.all().delete()
+
     def test_serializes_public_specialty_fields(self):
         specialty = Specialty.objects.create(
             code='cardiology',
@@ -37,6 +40,7 @@ class SpecialtySerializerTests(TestCase):
 
 class DoctorSelfProfileSerializerTests(TestCase):
     def setUp(self):
+        Specialty.objects.all().delete()
         self.doctor_user = User.objects.create_user(
             username='doctor-user',
             password='StrongPassword123',
