@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -10,18 +11,13 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import ChatMessage, ChatSession
+from .services.ai.exceptions import AIServiceError
+from .services.ai.qwen_provider import QwenProvider
+from .services.chat_orchestrator import orchestrate_chat
+from .services.clinical_state import persist_clinical_state
+from .services.context_builder import build_chat_context
+from .services.reply_builder import build_patient_reply
 
-
-def build_hakim_reply(user_message: str) -> str:
-    """
-    Temporary reply logic.
-    Later we will replace this with:
-    - safety triage checks
-    - emergency red flags
-    - AI model/API call
-    - specialty recommendation
-    """
-    return "رد تجريبي من Django"
 
 
 def get_or_create_chat_session(session_id, user):
@@ -98,7 +94,59 @@ def chat_messages(request):
         session.title = user_text[:60]
         session.save(update_fields=["title", "updated_at"])
 
-    assistant_reply = build_hakim_reply(user_text)
+    def ai_dependencies_factory():
+        provider = QwenProvider()
+
+        chat_context = build_chat_context(
+            session=session,
+            response_language=language,
+            max_context_messages=(
+                settings.AI_MAX_CONTEXT_MESSAGES
+            ),
+        )
+
+        return (
+            provider,
+            chat_context.ai_messages,
+            chat_context.allowed_specialty_codes,
+        )
+
+    try:
+        orchestration_result = orchestrate_chat(
+            user_text,
+            ai_dependencies_factory=ai_dependencies_factory,
+        )
+    except AIServiceError:
+        return JsonResponse(
+            {
+                "error": (
+                    "AI service is temporarily unavailable"
+                ),
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    clinical_state = persist_clinical_state(
+        session=session,
+        last_processed_message=user_message,
+        orchestration_result=orchestration_result,
+    )
+
+    specialty_name = None
+    specialty = clinical_state.suggested_specialty
+
+    if specialty is not None:
+        specialty_name = (
+            specialty.name_ar
+            if language == "ar"
+            else specialty.name_en
+        )
+
+    assistant_reply = build_patient_reply(
+        orchestration_result=orchestration_result,
+        response_language=language,
+        specialty_name=specialty_name,
+    )
 
     assistant_message = ChatMessage.objects.create(
         session=session,
