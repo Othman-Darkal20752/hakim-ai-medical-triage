@@ -2434,6 +2434,82 @@ class ChatOrchestratorTests(SimpleTestCase):
             SafetyDecisionType.EMERGENCY,
         )
 
+    def test_emergency_does_not_build_ai_dependencies(
+        self,
+    ) -> None:
+        patient_text = "I have loss of consciousness."
+        factory_call_count = 0
+
+        def ai_dependencies_factory():
+            nonlocal factory_call_count
+            factory_call_count += 1
+
+            raise AssertionError(
+                "AI dependencies must not be built "
+                "for emergency messages."
+            )
+
+        result = orchestrate_chat(
+            patient_text,
+            ai_dependencies_factory=ai_dependencies_factory,
+        )
+
+        self.assertEqual(factory_call_count, 0)
+        self.assertEqual(
+            result.execution_path,
+            ChatExecutionPath.BACKEND_SAFETY_RESPONSE,
+        )
+        self.assertFalse(result.should_call_ai_provider)
+        self.assertIsNone(result.triage_response)
+        self.assertEqual(
+            result.safety_decision.decision,
+            SafetyDecisionType.EMERGENCY,
+        )
+
+    def test_continue_builds_ai_dependencies_lazily(
+        self,
+    ) -> None:
+        patient_text = "I have a mild headache."
+        messages = self._make_messages(patient_text)
+        provider = _RecordingAIProvider(
+            self._make_provider_result(
+                urgency="routine",
+            )
+        )
+        factory_call_count = 0
+
+        def ai_dependencies_factory():
+            nonlocal factory_call_count
+            factory_call_count += 1
+
+            return (
+                provider,
+                messages,
+                self.allowed_specialty_codes,
+            )
+
+        result = orchestrate_chat(
+            patient_text,
+            ai_dependencies_factory=ai_dependencies_factory,
+        )
+
+        self.assertEqual(factory_call_count, 1)
+        self.assertEqual(provider.call_count, 1)
+        self.assertIs(provider.received_messages, messages)
+        self.assertEqual(
+            result.execution_path,
+            ChatExecutionPath.AI_PROVIDER,
+        )
+        self.assertTrue(result.should_call_ai_provider)
+        self.assertEqual(
+            result.triage_response.urgency,
+            "routine",
+        )
+        self.assertEqual(
+            result.triage_response.suggested_specialty_code,
+            "general_medicine",
+        )
+
     def test_urgent_safety_decision_applies_urgency_floor(
         self,
     ) -> None:

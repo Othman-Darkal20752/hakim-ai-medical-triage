@@ -18,6 +18,15 @@ SafetyEvaluator = Callable[
     StructuredSafetyDecision,
 ]
 
+AIDependenciesFactory = Callable[
+    [],
+    tuple[
+        AIProvider,
+        Sequence[AIMessage],
+        Collection[str],
+    ],
+]
+
 
 class ChatExecutionPath(str, Enum):
     """Backend-controlled execution paths for one patient message."""
@@ -115,18 +124,23 @@ class ChatOrchestrationResult:
 def orchestrate_chat(
     patient_text: str,
     *,
-    ai_provider: AIProvider,
-    ai_messages: Sequence[AIMessage],
-    allowed_specialty_codes: Collection[str],
+    ai_provider: AIProvider | None = None,
+    ai_messages: Sequence[AIMessage] | None = None,
+    allowed_specialty_codes: Collection[str] | None = None,
+    ai_dependencies_factory: AIDependenciesFactory | None = None,
     safety_evaluator: SafetyEvaluator = evaluate_chat_safety,
 ) -> ChatOrchestrationResult:
     """
     Process one patient message through the deterministic safety boundary.
 
     Emergency decisions are controlled entirely by the backend and
-    short-circuit the AI provider.
+    short-circuit before any AI dependency factory is invoked.
 
-    Urgent and continue decisions proceed to the injected AI provider.
+    Urgent and continue decisions proceed to the AI path. AI dependencies
+    may be supplied directly or built lazily through ai_dependencies_factory.
+    The lazy factory is invoked only after the backend safety decision allows
+    the AI path.
+
     The provider JSON is strictly validated by parse_triage_response()
     before it can become part of the orchestration result.
 
@@ -147,6 +161,39 @@ def orchestrate_chat(
             ),
             safety_decision=safety_decision,
             triage_response=None,
+        )
+
+    if ai_dependencies_factory is not None:
+        if (
+            ai_provider is not None
+            or ai_messages is not None
+            or allowed_specialty_codes is not None
+        ):
+            raise ValueError(
+                "Provide either ai_dependencies_factory or direct "
+                "AI dependencies, not both."
+            )
+
+        (
+            ai_provider,
+            ai_messages,
+            allowed_specialty_codes,
+        ) = ai_dependencies_factory()
+
+    if ai_provider is None:
+        raise TypeError(
+            "ai_provider is required for the AI provider path."
+        )
+
+    if ai_messages is None:
+        raise TypeError(
+            "ai_messages is required for the AI provider path."
+        )
+
+    if allowed_specialty_codes is None:
+        raise TypeError(
+            "allowed_specialty_codes is required for the "
+            "AI provider path."
         )
 
     provider_result = ai_provider.generate_structured(
