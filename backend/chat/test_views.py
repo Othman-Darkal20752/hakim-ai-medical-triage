@@ -6,11 +6,14 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from doctors.models import Specialty
+
 from .models import (
     ChatMessage,
     ChatSession,
     ConversationClinicalState,
 )
+from .services.ai.provider import AIProviderResult
 from .services.ai.schemas import TriageResponse
 from .services.chat_orchestrator import (
     ChatExecutionPath,
@@ -233,6 +236,169 @@ class ChatMessageAuthenticationTests(APITestCase):
         )
         self.assertEqual(ChatSession.objects.count(), 1)
         self.assertEqual(ChatMessage.objects.count(), 2)
+
+    @patch("chat.views.QwenProvider")
+    def test_non_emergency_ai_success_persists_state_and_reply(
+        self,
+        mock_qwen_provider,
+    ):
+        Specialty.objects.all().update(is_active=False)
+
+        specialty, _ = Specialty.objects.update_or_create(
+            code="general_medicine",
+            defaults={
+                "name_ar": "طب عام",
+                "name_en": "General Medicine",
+                "is_active": True,
+                "display_order": 1,
+            },
+        )
+
+        provider = mock_qwen_provider.return_value
+        provider.generate_structured.return_value = AIProviderResult(
+            provider="mock-provider",
+            model="mock-model",
+            raw_json=(
+                "{"
+                '"symptom_summary":['
+                '"Mild headache since this morning."],'
+                '"follow_up_questions":['
+                '"How long has the headache lasted?"],'
+                '"urgency":"routine",'
+                '"suggested_specialty_code":'
+                '"general_medicine",'
+                '"needs_more_information":false,'
+                '"emergency_warning":null,'
+                '"safety_disclaimer":'
+                '"This is preliminary medical guidance and not a '
+                'final diagnosis."'
+                "}"
+            ),
+            request_id="mock-request-id",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.url,
+            {
+                "message": "I have a mild headache.",
+                "language": "en",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        mock_qwen_provider.assert_called_once_with()
+        provider.generate_structured.assert_called_once()
+
+        provider_messages = (
+            provider.generate_structured.call_args.kwargs[
+                "messages"
+            ]
+        )
+
+        self.assertEqual(provider_messages[0].role, "system")
+        self.assertIn(
+            "general_medicine",
+            provider_messages[0].content,
+        )
+        self.assertEqual(
+            provider_messages[-1].role,
+            "user",
+        )
+        self.assertEqual(
+            provider_messages[-1].content,
+            "I have a mild headache.",
+        )
+
+        session = ChatSession.objects.get()
+        messages = list(
+            session.messages.order_by("created_at", "id")
+        )
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(
+            messages[0].sender,
+            ChatMessage.Sender.USER,
+        )
+        self.assertEqual(
+            messages[1].sender,
+            ChatMessage.Sender.ASSISTANT,
+        )
+
+        expected_reply = (
+            "Mild headache since this morning.\n\n"
+            "How long has the headache lasted?\n\n"
+            "Suggested medical specialty: General Medicine\n\n"
+            "This is preliminary medical guidance and not a "
+            "final diagnosis."
+        )
+        response_data = response.json()
+
+        self.assertEqual(
+            response_data["session_id"],
+            str(session.id),
+        )
+        self.assertEqual(
+            response_data["user_message_id"],
+            messages[0].id,
+        )
+        self.assertEqual(
+            response_data["assistant_message_id"],
+            messages[1].id,
+        )
+        self.assertEqual(response_data["reply"], expected_reply)
+        self.assertEqual(messages[1].content, expected_reply)
+
+        clinical_state = ConversationClinicalState.objects.get(
+            session=session,
+        )
+
+        self.assertEqual(
+            clinical_state.last_processed_message,
+            messages[0],
+        )
+        self.assertEqual(
+            clinical_state.urgency,
+            ConversationClinicalState.Urgency.ROUTINE,
+        )
+        self.assertEqual(
+            clinical_state.safety_decision,
+            ConversationClinicalState.SafetyDecision.CONTINUE,
+        )
+        self.assertEqual(
+            clinical_state.execution_path,
+            ConversationClinicalState.ExecutionPath.AI_PROVIDER,
+        )
+        self.assertEqual(
+            clinical_state.suggested_specialty,
+            specialty,
+        )
+        self.assertEqual(
+            clinical_state.suggested_specialty_code,
+            "general_medicine",
+        )
+        self.assertEqual(
+            clinical_state.structured_state["triage_response"],
+            {
+                "symptom_summary": [
+                    "Mild headache since this morning.",
+                ],
+                "follow_up_questions": [
+                    "How long has the headache lasted?",
+                ],
+                "needs_more_information": False,
+                "emergency_warning": None,
+                "safety_disclaimer": (
+                    "This is preliminary medical guidance and "
+                    "not a final diagnosis."
+                ),
+            },
+        )
 
     @override_settings(AI_ENABLED=False)
     def test_emergency_message_short_circuits_ai_and_persists_state(
